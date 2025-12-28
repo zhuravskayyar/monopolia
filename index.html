@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Монополія — облік власності з будинками</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #f0f8ff;
+    background-image:
+        linear-gradient(#e0f0ff 1px, transparent 1px),
+        linear-gradient(90deg, #e0f0ff 1px, transparent 1px);
+    background-size: 30px 30px;
+    font-family: "Comic Sans MS", "Segoe Print", "Arial Rounded MT Bold", cursive;
+    color: #0a3d91;
+    padding: 20px;
+    margin: 0;
+}
+
+h1, h2, h3 {
+    text-align: center;
+    margin-top: 0;
+}
+
+h1 {
+    color: #0a3d91;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    background: linear-gradient(90deg, #0a3d91, #1e90ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding: 10px;
+}
+
+.container {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.box {
+    border: 3px solid #0a3d91;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    min-width: 300px;
+    flex: 1;
+    max-width: 500px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    border-radius: 15px;
+}
+
+button {
+    font-family: inherit;
+    background: linear-gradient(145deg, #0a3d91, #1e90ff);
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    color: white;
+    border-radius: 8px;
+    margin: 5px;
+    font-weight: bold;
+    transition: all 0.3s;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 3px 3px 8px rgba(0,0,0,0.3);
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+select, input {
+    font-family: inherit;
+    color: #0a3d91;
+    border: 2px solid #0a3d91;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 5px 0;
+    width: 100%;
+    background: white;
+}
+
+.card {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 5px solid #0a3d91;
+    background: white;
+    padding: 30px;
+    z-index: 100;
+    min-width: 400px;
+    max-width: 600px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.4);
+    border-radius: 20px;
+    text-align: center;
+}
+
+.hidden { 
+    display: none; 
+}
+
+.owner {
+    font-size: 0.9em;
+    margin: 5px 0;
+    padding: 3px 8px;
+    border-radius: 5px;
+    display: inline-block;
+}
+
+.street-item {
+    padding: 15px;
+    border-bottom: 2px dashed #ccc;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    transition: all 0.3s;
+}
+
+.street-item:hover {
+    background-color: rgba(10, 61, 145, 0.05);
+    transform: translateX(5px);
+}
+
+.street-name {
+    font-weight: bold;
+    color: #0a3d91;
+    font-size: 1.2em;
+    margin-bottom: 5px;
+}
+
+.street-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.house-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(10, 61, 145, 0.05);
+    border-radius: 8px;
+}
+
+.house-count {
+    font-weight: bold;
+    color: #0a3d91;
+    font-size: 1.2em;
+}
+
+.house-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.house-buttons button {
+    padding: 5px 10px;
+    font-size: 0.9em;
+}
+
+.house {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+.hotel {
+    color: #2ecc71;
+    font-weight: bold;
+}
+
+.rent-info {
+    background: linear-gradient(145deg, #e3f2fd, #bbdefb);
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px 0;
+    border-left: 4px solid #0a3d91;
+}
+
+.rent-amount {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #0a3d91;
+}
+
+.player-item {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.player-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+}
+
+.remove-player {
+    background: linear-gradient(145deg, #ff6b6b, #ee5a52);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+}
+
+.total-value {
+    font-weight: bold;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 3px solid #0a3d91;
+    text-align: center;
+    font-size: 1.1em;
+}
+
+.color-group {
+    font-size: 0.8em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: white;
+    font-weight: bold;
+}
+
+.monopoly-badge {
+    background: gold;
+    color: #0a3d91;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.8em;
+    font-weight: bold;
+    margin-left: 10px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.property-card {
+    border: 3px solid;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 20px 0;
+    background: white;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+}
+
+.rent-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+
+.rent-table td {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+.rent-table tr:last-child td {
+    border-bottom: none;
+}
+
+.rent-table .highlight {
+    background: #e3f2fd;
+    font-weight: bold;
+}
+
+.card-title {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 10px;
+    color: white;
+}
+
+@media (max-width: 1200px) {
+    .container {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .box {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .card {
+        min-width: 90vw;
+        padding: 20px;
+    }
+    
+    .street-actions {
+        flex-direction: column;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>🏢 Монополія — Облік власності з будинками 🏠</h1>
+</div>
+
+<div class="container">
+    <div class="box">
+        <h2>👥 Гравці</h2>
+        <div id="players"></div>
+        <button onclick="addPlayer()">➕ Додати гравця</button>
+        <div class="total-value" id="playerStats"></div>
+    </div>
+
+    <div class="box">
+        <h2>🏘️ Власність</h2>
+        <div id="streets"></div>
+        <div class="total-value" id="totalStats"></div>
+    </div>
+
+    <div class="box">
+        <h2>🎴 Картки та дії</h2>
+        <div class="card-buttons" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 20px 0;">
+            <button onclick="openChance()">🎲 Шанс</button>
+            <button onclick="openCommunity()">📦 Суспільна казна</button>
+            <button onclick="showAllProperties()">📋 Всі вулиці</button>
+            <button onclick="resetGame()">🔄 Нова гра</button>
+        </div>
+        
+        <h3>💰 Калькулятор оренди</h3>
+        <div id="rentCalculator">
+            <p>Оберіть вулицю та подивіться, скільки має заплатити гравець:</p>
+            <select id="calcStreetSelect" onchange="calculateRentForStreet()">
+                <option value="">Оберіть вулицю</option>
+            </select>
+            <div id="rentResult" class="rent-info" style="margin-top: 10px;"></div>
+        </div>
+        
+        <h3>📊 Статистика гри</h3>
+        <div id="gameStats"></div>
+    </div>
+</div>
+
+<div id="overlay" class="overlay hidden" onclick="closeCard()"></div>
+
+<div id="card" class="card hidden">
+    <h2 id="cardTitle"></h2>
+    <div id="cardContent"></div>
+    <button onclick="closeCard()">Закрити</button>
+</div>
+
+<script>
+// Дані гри
+let players = [];
+
+// ТВОЇ ВУЛИЦІ - повністю замінено блок властивостей
+let properties = [
+    // 🔴 Коричнева група (2 вулиці)
+    {name: "Чкалова", price: 60, rent: [2, 10, 30, 90, 160, 250], houseCost: 50, color: "#8B4513", group: "brown", houses: 0},
+    {name: "Тельмана", price: 60, rent: [4, 20, 60, 180, 320, 450], houseCost: 50, color: "#8B4513", group: "brown", houses: 0},
+
+    // 🔵 Блакитна група (3 вулиці)
+    {name: "Вокзальна", price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, color: "#87CEEB", group: "lightblue", houses: 0},
+    {name: "Озерна", price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50, color: "#87CEEB", group: "lightblue", houses: 0},
+    {name: "Польова", price: 120, rent: [8, 40, 100, 300, 450, 600], houseCost: 50, color: "#87CEEB", group: "lightblue", houses: 0},
+
+    // 🟣 Рожева група (3 вулиці)
+    {name: "Матросова", price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, color: "#FF69B4", group: "pink", houses: 0},
+    {name: "Набережна", price: 140, rent: [10, 50, 150, 450, 625, 750], houseCost: 100, color: "#FF69B4", group: "pink", houses: 0},
+    {name: "Маяковського", price: 160, rent: [12, 60, 180, 500, 700, 900], houseCost: 100, color: "#FF69B4", group: "pink", houses: 0},
+
+    // 🟠 Помаранчева група (3 вулиці)
+    {name: "Ватутіна", price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, color: "#FFA500", group: "orange", houses: 0},
+    {name: "Садова", price: 180, rent: [14, 70, 200, 550, 750, 950], houseCost: 100, color: "#FFA500", group: "orange", houses: 0},
+    {name: "Сонячна", price: 200, rent: [16, 80, 220, 600, 800, 1000], houseCost: 100, color: "#FFA500", group: "orange", houses: 0},
+
+    // 🔴 Червона група (3 вулиці)
+    {name: "Молодіжна", price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, color: "#FF0000", group: "red", houses: 0},
+    {name: "Фрунзе", price: 220, rent: [18, 90, 250, 700, 875, 1050], houseCost: 150, color: "#FF0000", group: "red", houses: 0},
+    {name: "Заводська", price: 240, rent: [20, 100, 300, 750, 925, 1100], houseCost: 150, color: "#FF0000", group: "red", houses: 0},
+
+    // 🟡 Жовта група (3 вулиці)
+    {name: "Козацька", price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, color: "#FFD700", group: "yellow", houses: 0},
+    {name: "Лесі Українки", price: 260, rent: [22, 110, 330, 800, 975, 1150], houseCost: 150, color: "#FFD700", group: "yellow", houses: 0},
+    {name: "Соборна", price: 280, rent: [24, 120, 360, 850, 1025, 1200], houseCost: 150, color: "#FFD700", group: "yellow", houses: 0},
+
+    // 🟢 Зелена група (3 вулиці)
+    {name: "Грушевського", price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, color: "#32CD32", group: "green", houses: 0},
+    {name: "Незалежності", price: 300, rent: [26, 130, 390, 900, 1100, 1275], houseCost: 200, color: "#32CD32", group: "green", houses: 0},
+    {name: "Шевченка", price: 320, rent: [28, 150, 450, 1000, 1200, 1400], houseCost: 200, color: "#32CD32", group: "green", houses: 0},
+
+    // 🔵 Синя група (2 вулиці)
+    {name: "Київська", price: 350, rent: [35, 175, 500, 1100, 1300, 1500], houseCost: 200, color: "#0000FF", group: "blue", houses: 0},
+    {name: "Миру", price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, color: "#0000FF", group: "blue", houses: 0}
+];
+
+// Ініціалізація
+function init() {
+    players = [
+        {name: "Гравець 1", color: "#FF6B6B", money: 1500},
+        {name: "Гравець 2", color: "#4ECDC4", money: 1500}
+    ];
+    
+    renderPlayers();
+    updateGame();
+    populateStreetSelector();
+}
+
+// Відображення гравців
+function renderPlayers() {
+    const div = document.getElementById("players");
+    div.innerHTML = "";
+    
+    players.forEach((player, index) => {
+        div.innerHTML += `
+            <div class="player-item">
+                <div class="player-color" style="background-color: ${player.color}"></div>
+                <input value="${player.name}" onchange="players[${index}].name=this.value; updateGame()" placeholder="Ім'я гравця">
+                <input type="number" value="${player.money}" onchange="players[${index}].money=parseInt(this.value); updateGame()" placeholder="Гроші" style="width: 120px;">
+                <button class="remove-player" onclick="removePlayer(${index})">×</button>
+            </div>`;
+    });
+}
+
+// Додавання гравця
+function addPlayer() {
+    if (players.length >= 8) return alert("Максимум 8 гравців");
+    
+    const colors = ['#FF6B6B', '#4ECDC4', '#FFD166', '#06D6A0', '#118AB2', '#EF476F', '#7209B7', '#F15BB5'];
+    const playerNum = players.length + 1;
+    
+    players.push({
+        name: `Гравець ${playerNum}`,
+        color: colors[players.length % colors.length],
+        money: 1500
+    });
+    
+    renderPlayers();
+    updateGame();
+    populateStreetSelector();
+}
+
+// Видалення гравця
+function removePlayer(index) {
+    if (confirm(`Видалити гравця ${players[index].name}? Усі його вулиці будуть звільнені.`)) {
+        // Звільняємо вулиці
+        properties.forEach(property => {
+            if (property.owner === players[index].name) {
+                property.owner = null;
+                property.houses = 0;
+            }
+        });
+        
+        players.splice(index, 1);
+        renderPlayers();
+        updateGame();
+        populateStreetSelector();
+    }
+}
+
+// Відображення вулиць
+function renderStreets() {
+    const div = document.getElementById("streets");
+    div.innerHTML = "";
+    
+    properties.forEach((property, index) => {
+        const isOwned = property.owner ? true : false;
+        const ownerColor = isOwned ? getPlayerColor(property.owner) : '#cccccc';
+        const isMonopoly = checkMonopoly(property.group, property.owner);
+        const currentRent = calculateCurrentRent(property);
+        
+        div.innerHTML += `
+            <div class="street-item" style="border-left: 5px solid ${property.color}">
+                <div class="street-name">
+                    ${property.name}
+                    ${isMonopoly ? '<span class="monopoly-badge">Монополія!</span>' : ''}
+                </div>
+                <div class="owner" style="background-color: ${ownerColor}20; border: 1px solid ${ownerColor}">
+                    ${property.owner ? "Власник: " + property.owner : "Вільна"}
+                </div>
+                <div>Вартість: ${property.price} ₴</div>
+                <div>Вартість будинку: ${property.houseCost} ₴</div>
+                
+                <div class="rent-info">
+                    <div>Поточна оренда: <span class="rent-amount">${currentRent} ₴</span></div>
+                    <div>${property.houses === 0 ? 'Без будинків' : property.houses === 5 ? 'Готель' : property.houses + ' будинки'}</div>
+                </div>
+                
+                ${isOwned ? `
+                    <div class="house-controls">
+                        <div>Будинки:</div>
+                        <div class="house-count">${property.houses === 5 ? '🏨 Готель' : '🏠'.repeat(property.houses)}</div>
+                        <div class="house-buttons">
+                            <button onclick="addHouse(${index})" ${property.houses >= 5 || !isMonopoly ? 'disabled' : ''}>+ Будинок</button>
+                            <button onclick="removeHouse(${index})" ${property.houses <= 0 ? 'disabled' : ''}>- Будинок</button>
+                            <button onclick="addHotel(${index})" ${property.houses !== 4 || !isMonopoly ? 'disabled' : ''}>🏨 Готель</button>
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <div class="street-actions">
+                    <select onchange="assignProperty(${index}, this.value)" ${players.length === 0 ? 'disabled' : ''}>
+                        <option value="">— обрати власника —</option>
+                        ${players.map(player => `<option ${property.owner === player.name ? 'selected' : ''}>${player.name}</option>`).join("")}
+                    </select>
+                    <button onclick="showPropertyCard(${index})">📋 Картка</button>
+                    ${property.owner ? `<button onclick="freeProperty(${index})">🗑️ Звільнити</button>` : ''}
+                </div>
+            </div>`;
+    });
+}
+
+// Привласнити вулицю гравцю
+function assignProperty(index, ownerName) {
+    const property = properties[index];
+    
+    if (ownerName === "") {
+        property.owner = null;
+        property.houses = 0;
+    } else {
+        property.owner = ownerName;
+    }
+    
+    updateGame();
+}
+
+// Звільнити вулицю
+function freeProperty(index) {
+    properties[index].owner = null;
+    properties[index].houses = 0;
+    updateGame();
+}
+
+// Додати будинок
+function addHouse(index) {
+    const property = properties[index];
+    
+    if (property.houses < 4 && checkMonopoly(property.group, property.owner)) {
+        property.houses++;
+        updateGame();
+    }
+}
+
+// Видалити будинок
+function removeHouse(index) {
+    const property = properties[index];
+    
+    if (property.houses > 0) {
+        property.houses--;
+        updateGame();
+    }
+}
+
+// Додати готель
+function addHotel(index) {
+    const property = properties[index];
+    
+    if (property.houses === 4 && checkMonopoly(property.group, property.owner)) {
+        property.houses = 5;
+        updateGame();
+    }
+}
+
+// Перевірити монополію
+function checkMonopoly(group, owner) {
+    if (!owner) return false;
+    
+    const groupProperties = properties.filter(p => p.group === group);
+    const ownedProperties = groupProperties.filter(p => p.owner === owner);
+    
+    return groupProperties.length === ownedProperties.length;
+}
+
+// Розрахувати поточну оренду
+function calculateCurrentRent(property) {
+    if (!property.owner) return 0;
+    
+    const isMonopoly = checkMonopoly(property.group, property.owner);
+    
+    // ✅ Якщо монополія і немає будинків - оренда подвоюється
+    if (isMonopoly && property.houses === 0) {
+        return property.rent[0] * 2;
+    }
+    
+    // З будинками/готелями
+    return property.rent[property.houses];
+}
+
+// Отримати колір гравця
+function getPlayerColor(playerName) {
+    const player = players.find(p => p.name === playerName);
+    return player ? player.color : '#cccccc';
+}
+
+// Показати картку вулиці
+function showPropertyCard(index) {
+    const property = properties[index];
+    const isMonopoly = checkMonopoly(property.group, property.owner);
+    const currentRent = calculateCurrentRent(property);
+    
+    let content = `
+        <div class="property-card" style="border-color: ${property.color}">
+            <div class="card-title" style="background: ${property.color}">${property.name}</div>
+            <div style="margin: 15px 0;">
+                <strong>Власник:</strong> ${property.owner || "Немає"}<br>
+                <strong>Вартість:</strong> ${property.price} ₴<br>
+                <strong>Вартість будинку:</strong> ${property.houseCost} ₴<br>
+                <strong>Будинки:</strong> ${property.houses === 5 ? 'Готель' : property.houses}<br>
+                ${isMonopoly ? '<div style="color: gold; font-weight: bold; margin: 10px 0;">⭐ Монополія!</div>' : ''}
+            </div>
+            
+            <table class="rent-table">
+                <tr><td>Оренда без будинків</td><td><strong>${property.rent[0]} ₴</strong></td></tr>
+                <tr><td>З 1 будинком</td><td>${property.rent[1]} ₴</td></tr>
+                <tr><td>З 2 будинками</td><td>${property.rent[2]} ₴</td></tr>
+                <tr><td>З 3 будинками</td><td>${property.rent[3]} ₴</td></tr>
+                <tr><td>З 4 будинками</td><td>${property.rent[4]} ₴</td></tr>
+                <tr><td>З готелем</td><td><strong>${property.rent[5]} ₴</strong></td></tr>
+            </table>
+            
+            <div class="rent-info" style="margin-top: 20px; font-size: 1.2em;">
+                <strong>Поточна оренда:</strong> <span style="color: #0a3d91; font-weight: bold; font-size: 1.3em;">${currentRent} ₴</span><br>
+                <small>${property.owner ? `Якщо інший гравець зупиниться тут, він має заплатити ${currentRent} ₴ гравцю ${property.owner}` : "Вулиця вільна для купівлі"}</small>
+            </div>
+        </div>`;
+    
+    showCard(property.name, content);
+}
+
+// Показати всі вулиці
+function showAllProperties() {
+    let content = "<h3>Всі вулиці в грі</h3>";
+    
+    // Групуємо за кольорами
+    const groups = {};
+    properties.forEach(property => {
+        if (!groups[property.group]) {
+            groups[property.group] = [];
+        }
+        groups[property.group].push(property);
+    });
+    
+    // Сортуємо групи за логічним порядком
+    const groupOrder = ['brown', 'lightblue', 'pink', 'orange', 'red', 'yellow', 'green', 'blue'];
+    
+    groupOrder.forEach(group => {
+        if (groups[group]) {
+            const groupProperties = groups[group];
+            const color = groupProperties[0].color;
+            const groupNames = {
+                'brown': '🔴 Коричнева',
+                'lightblue': '🔵 Блакитна', 
+                'pink': '🟣 Рожева',
+                'orange': '🟠 Помаранчева',
+                'red': '🔴 Червона',
+                'yellow': '🟡 Жовта',
+                'green': '🟢 Зелена',
+                'blue': '🔵 Синя'
+            };
+            
+            content += `
+                <div class="property-card" style="border-color: ${color}; margin-bottom: 20px;">
+                    <div style="background: ${color}; color: white; padding: 10px; border-radius: 10px 10px 0 0;">
+                        <strong>${groupNames[group]}</strong> (${groupProperties.length} вулиць)
+                    </div>
+                    <div style="padding: 15px;">
+                        ${groupProperties.map(p => `
+                            <div style="margin: 8px 0; padding: 8px; background: ${p.owner ? getPlayerColor(p.owner)+'20' : '#f5f5f5'}; border-radius: 5px;">
+                                <strong>${p.name}</strong> - ${p.price} ₴
+                                ${p.owner ? `<br><small>Власник: ${p.owner}, будинки: ${p.houses}, оренда: ${calculateCurrentRent(p)} ₴</small>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+        }
+    });
+    
+    showCard("Всі вулиці", content);
+}
+
+// Показати картку шансу
+function openChance() {
+    const chanceCards = [
+        "Пройдіть на Старт. Отримайте 200 ₴.",
+        "Банк виплачує вам дивіденди у розмірі 50 ₴.",
+        "Ви отримуєте виграш у лотерею. Отримайте 100 ₴.",
+        "Звільнення з в'язниці. Ця карта може бути збережена до потрібного моменту.",
+        "Відправляйтесь у в'язницю. Прямо у в'язницю, не проходьте «Старт», не отримуйте 200 ₴.",
+        "Оплатіть штраф за перевищення швидкості — 15 ₴.",
+        "Ремонт вулиць. За кожен будинок заплатите 25 ₴, за кожен готель — 100 ₴.",
+        "Аванс у розмірі 100 ₴."
+    ];
+    
+    const randomCard = chanceCards[Math.floor(Math.random() * chanceCards.length)];
+    showCard("🎲 Шанс", `<div style="padding: 30px; font-size: 1.2em;">${randomCard}</div>`);
+}
+
+// Показати картку суспільної казни
+function openCommunity() {
+    const communityCards = [
+        "Помилка банку на вашу користь. Отримайте 200 ₴.",
+        "Оплатіть лікарняний збір 100 ₴.",
+        "Ви зайняли друге місце в конкурсі краси. Отримайте 10 ₴.",
+        "На день народження кожен гравець дарує вам 10 ₴.",
+        "Повернення податку. Отримайте 20 ₴.",
+        "Оплатіть страховку — 50 ₴.",
+        "Збір на Різдво. Отримайте 100 ₴ від кожного гравця.",
+        "Ви отримали спадщину. Отримайте 100 ₴."
+    ];
+    
+    const randomCard = communityCards[Math.floor(Math.random() * communityCards.length)];
+    showCard("📦 Суспільна казна", `<div style="padding: 30px; font-size: 1.2em;">${randomCard}</div>`);
+}
+
+// Показати картку
+function showCard(title, content) {
+    document.getElementById("cardTitle").innerHTML = title;
+    document.getElementById("cardContent").innerHTML = content;
+    document.getElementById("card").classList.remove("hidden");
+    document.getElementById("overlay").classList.remove("hidden");
+}
+
+// Закрити картку
+function closeCard() {
+    document.getElementById("card").classList.add("hidden");
+    document.getElementById("overlay").classList.add("hidden");
+}
+
+// Оновити статистику гравців
+function updatePlayerStats() {
+    const statsDiv = document.getElementById("playerStats");
+    
+    if (players.length === 0) {
+        statsDiv.innerHTML = "Додайте гравців для початку гри";
+        return;
+    }
+    
+    let statsHTML = "<h3>Гравці та їхня власність:</h3>";
+    
+    players.forEach(player => {
+        const playerProperties = properties.filter(p => p.owner === player.name);
+        const totalValue = playerProperties.reduce((sum, prop) => sum + prop.price, 0);
+        const housesCount = playerProperties.reduce((sum, prop) => sum + prop.houses, 0);
+        const hotelsCount = playerProperties.filter(prop => prop.houses === 5).length;
+        
+        statsHTML += `
+            <div style="margin: 10px 0; padding: 10px; border-radius: 8px; background-color: ${player.color}20; border-left: 4px solid ${player.color};">
+                <strong>${player.name}</strong><br>
+                Гроші: ${player.money} ₴<br>
+                Вулиць: ${playerProperties.length}<br>
+                Будинки: ${housesCount} (готелів: ${hotelsCount})<br>
+                Вартість власності: ${totalValue} ₴
+            </div>`;
+    });
+    
+    statsDiv.innerHTML = statsHTML;
+}
+
+// Оновити загальну статистику
+function updateTotalStats() {
+    const statsDiv = document.getElementById("totalStats");
+    const ownedProperties = properties.filter(p => p.owner).length;
+    const freeProperties = properties.length - ownedProperties;
+    const totalHouses = properties.reduce((sum, prop) => sum + (prop.houses < 5 ? prop.houses : 0), 0);
+    const totalHotels = properties.filter(prop => prop.houses === 5).length;
+    
+    statsDiv.innerHTML = `
+        <div>Всього вулиць: ${properties.length}</div>
+        <div>Зайнято: ${ownedProperties}, Вільних: ${freeProperties}</div>
+        <div>Побудовано будинків: ${totalHouses}, готелів: ${totalHotels}</div>
+    `;
+}
+
+// Оновити статистику гри
+function updateGameStats() {
+    const statsDiv = document.getElementById("gameStats");
+    
+    // ✅ Знаходимо найбагатшого гравця
+    let richestPlayer = null;
+    let maxWealth = 0;
+    
+    players.forEach(player => {
+        const playerProperties = properties.filter(p => p.owner === player.name);
+        const propertyValue = playerProperties.reduce((sum, prop) => sum + prop.price, 0);
+        const totalWealth = player.money + propertyValue;
+        
+        if (totalWealth > maxWealth) {
+            maxWealth = totalWealth;
+            richestPlayer = player.name;
+        }
+    });
+    
+    // ✅ Знаходимо монополії
+    const monopolies = [];
+    const groups = ["brown", "lightblue", "pink", "orange", "red", "yellow", "green", "blue"];
+    
+    groups.forEach(group => {
+        const groupProperties = properties.filter(p => p.group === group);
+        if (groupProperties.length > 0) {
+            const owners = [...new Set(groupProperties.map(p => p.owner).filter(o => o))];
+            if (owners.length === 1 && owners[0]) {
+                monopolies.push({
+                    group: groupProperties[0].name.split(" ")[0], 
+                    owner: owners[0], 
+                    color: groupProperties[0].color,
+                    fullGroupName: getGroupName(group)
+                });
+            }
+        }
+    });
+    
+    // ✅ Знайдемо найдорожчу вулицю
+    let mostExpensiveStreet = "";
+    let maxPrice = 0;
+    properties.forEach(prop => {
+        if (prop.price > maxPrice) {
+            maxPrice = prop.price;
+            mostExpensiveStreet = prop.name;
+        }
+    });
+    
+    statsDiv.innerHTML = `
+        <div>🎯 <strong>Найдорожча вулиця:</strong> ${mostExpensiveStreet} (${maxPrice} ₴)</div>
+        <div>💰 <strong>Найбагатший гравець:</strong> ${richestPlayer || "Немає даних"}</div>
+        <div>⭐ <strong>Монополії:</strong> ${monopolies.length > 0 ? monopolies.map(m => `<span style="color:${m.color}">${m.fullGroupName}</span> (${m.owner})`).join(", ") : "Немає"}</div>
+        <div>🏠 <strong>Всього будинків побудовано:</strong> ${properties.reduce((sum, prop) => sum + (prop.houses < 5 ? prop.houses : 0), 0)}</div>
+        <div>🏨 <strong>Всього готелів побудовано:</strong> ${properties.filter(prop => prop.houses === 5).length}</div>
+    `;
+}
+
+// Отримати назву групи за її ключем
+function getGroupName(groupKey) {
+    const groupNames = {
+        'brown': 'Коричнева',
+        'lightblue': 'Блакитна', 
+        'pink': 'Рожева',
+        'orange': 'Помаранчева',
+        'red': 'Червона',
+        'yellow': 'Жовта',
+        'green': 'Зелена',
+        'blue': 'Синя'
+    };
+    return groupNames[groupKey] || groupKey;
+}
+
+// Заповнити селектор для калькулятора оренди
+function populateStreetSelector() {
+    const select = document.getElementById("calcStreetSelect");
+    select.innerHTML = '<option value="">Оберіть вулицю</option>';
+    
+    properties.forEach((prop, index) => {
+        select.innerHTML += `<option value="${index}">${prop.name} (${prop.owner || "вільна"})</option>`;
+    });
+}
+
+// ✅ Розрахувати оренду для обраної вулиці
+function calculateRentForStreet() {
+    const select = document.getElementById("calcStreetSelect");
+    const resultDiv = document.getElementById("rentResult");
+    
+    if (!select.value) {
+        resultDiv.innerHTML = "Оберіть вулицю для розрахунку оренди";
+        return;
+    }
+    
+    const index = parseInt(select.value);
+    const property = properties[index];
+    const rent = calculateCurrentRent(property);
+    const isMonopoly = checkMonopoly(property.group, property.owner);
+    
+    if (!property.owner) {
+        resultDiv.innerHTML = `
+            <strong>${property.name}</strong><br>
+            <em>Вулиця вільна для купівлі</em><br>
+            <strong>Ціна купівлі: ${property.price} ₴</strong><br>
+            <small>Базова оренда: ${property.rent[0]} ₴</small>
+        `;
+    } else {
+        let monopolyInfo = "";
+        if (isMonopoly) {
+            monopolyInfo = `<div style="color: gold; font-weight: bold; margin: 5px 0;">⭐ Монополія (оренда подвоєна без будинків)</div>`;
+        }
+        
+        resultDiv.innerHTML = `
+            <strong>${property.name}</strong><br>
+            Власник: <span style="color: ${getPlayerColor(property.owner)}">${property.owner}</span><br>
+            Будинки: ${property.houses === 5 ? '🏨 Готель' : '🏠'.repeat(property.houses) || 'Немає'}<br>
+            ${monopolyInfo}
+            <div style="font-size: 1.4em; color: #0a3d91; font-weight: bold; margin: 10px 0;">
+                ОРЕНДА: ${rent} ₴
+            </div>
+            <small>Якщо гравець зупиниться тут, він має заплатити ${rent} ₴ гравцю ${property.owner}</small>
+        `;
+    }
+}
+
+// Скинути гру
+function resetGame() {
+    if (confirm("Розпочати нову гру? Усі поточні дані будуть втрачені.")) {
+        init();
+    }
+}
+
+// Оновити всю гру
+function updateGame() {
+    renderStreets();
+    updatePlayerStats();
+    updateTotalStats();
+    updateGameStats();
+    populateStreetSelector();
+    calculateRentForStreet();
+}
+
+// Ініціалізація при завантаженні
+window.onload = init;
+</script>
+</body>
+</html>
