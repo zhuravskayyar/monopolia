@@ -554,6 +554,46 @@ select:focus, input:focus {
     font-size: 0.9em;
 }
 
+.save-notification {
+    position: fixed;
+    bottom: 100px;
+    right: 20px;
+    background: #4CAF50;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    z-index: 1000;
+    animation: slideInRight 0.3s ease;
+    display: none;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.auto-save-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    color: #666;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    display: none;
+    align-items: center;
+    gap: 8px;
+}
+
 @media (max-width: 768px) {
     .container {
         flex-direction: column;
@@ -603,6 +643,20 @@ select:focus, input:focus {
         min-width: 95%;
         max-height: 90vh;
     }
+    
+    .save-notification {
+        bottom: 80px;
+        right: 10px;
+        left: 10px;
+        text-align: center;
+    }
+    
+    .auto-save-indicator {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        justify-content: center;
+    }
 }
 
 @media (min-width: 769px) {
@@ -617,6 +671,11 @@ select:focus, input:focus {
 
 <div class="header">
     <h1>🏢 Монополія — Облік власності 🏠🚂⚡💧</h1>
+</div>
+
+<div class="auto-save-indicator" id="autoSaveIndicator">
+    <span class="save-icon">💾</span>
+    <span class="save-text">Автозбереження...</span>
 </div>
 
 <div class="tab-buttons">
@@ -696,6 +755,12 @@ select:focus, input:focus {
             <button onclick="drawTransportCard()" class="secondary">
                 <span>🚗</span> Транспорт
             </button>
+            <button onclick="saveGameManually()" class="success">
+                <span>💾</span> Зберегти гру
+            </button>
+            <button onclick="loadGame()" class="warning">
+                <span>📂</span> Завантажити
+            </button>
             <button onclick="resetGame()" class="danger">
                 <span>🔄</span> Нова гра
             </button>
@@ -728,6 +793,10 @@ select:focus, input:focus {
         
         <h3>📊 Статистика гри</h3>
         <div id="gameStats"></div>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 15px; font-size: 0.9em; color: #666;">
+            <strong>💾 Автозбереження:</strong> Прогрес автоматично зберігається у вашому браузері
+        </div>
     </div>
 </div>
 
@@ -742,8 +811,8 @@ select:focus, input:focus {
         <button onclick="drawTransportCard()" class="small secondary">
             🚗 Транспорт
         </button>
-        <button onclick="showAllProperties()" class="small">
-            📋 Власність
+        <button onclick="saveGameManually()" class="small success">
+            💾 Зберегти
         </button>
         <button onclick="rollDice()" class="small">
             🎲 Кубики
@@ -752,6 +821,10 @@ select:focus, input:focus {
             🔄 Нова
         </button>
     </div>
+</div>
+
+<div id="saveNotification" class="save-notification">
+    💾 Гра збережена!
 </div>
 
 <div id="overlay" class="overlay hidden" onclick="closeCard()"></div>
@@ -763,12 +836,26 @@ select:focus, input:focus {
 </div>
 
 <script>
+// Ключі для localStorage
+const STORAGE_KEYS = {
+    PLAYERS: 'monopoly_players',
+    PROPERTIES: 'monopoly_properties',
+    RAILROADS: 'monopoly_railroads',
+    UTILITIES: 'monopoly_utilities',
+    TRANSPORT_CARDS: 'monopoly_transport_cards',
+    LAST_SAVED: 'monopoly_last_saved',
+    GAME_VERSION: 'monopoly_game_version'
+};
+
+// Версія гри (для оновлень)
+const GAME_VERSION = '1.2';
+
 // Дані гри
 let players = [];
 let transportCardsUsed = [];
 
-// Вулиці
-let properties = [
+// Шаблони власності (для ініціалізації)
+const propertyTemplates = [
     // 🔴 Коричнева група (2 вулиці)
     {name: "Чкалова", price: 60, rent: [2, 10, 30, 90, 160, 250], houseCost: 50, color: "#8B4513", group: "brown", houses: 0},
     {name: "Тельмана", price: 60, rent: [4, 20, 60, 180, 320, 450], houseCost: 50, color: "#8B4513", group: "brown", houses: 0},
@@ -808,22 +895,19 @@ let properties = [
     {name: "Миру", price: 400, rent: [50, 200, 600, 1400, 1700, 2000], houseCost: 200, color: "#0000FF", group: "blue", houses: 0}
 ];
 
-// Вокзали (українські назви)
-let railroads = [
+const railroadTemplates = [
     {name: "Залізнична автостанція", price: 200, color: "#795548", mortgage: 100, group: "railroad", icon: "🚂"},
     {name: "Бурякопункт", price: 200, color: "#795548", mortgage: 100, group: "railroad", icon: "🚚"},
     {name: "Гадяцька траса", price: 200, color: "#795548", mortgage: 100, group: "railroad", icon: "🛣️"},
     {name: "Вокзал", price: 200, color: "#795548", mortgage: 100, group: "railroad", icon: "🚉"}
 ];
 
-// Комунікації
-let utilities = [
+const utilityTemplates = [
     {name: "Артополіт (Водопостачання)", price: 150, color: "#2196F3", mortgage: 75, group: "utility", icon: "💧"},
     {name: "Обленерго (Електропостачання)", price: 150, color: "#FF9800", mortgage: 75, group: "utility", icon: "⚡"}
 ];
 
-// Транспортні карти
-let transportCards = [
+const transportCardTemplates = [
     {type: "control", name: "Контрольований переїзд", description: "Можеш поїхати на будь-яку клітинку поля. ❗ Якщо проїжджаєш «Старт» — +200 НЕ отримуєш"},
     {type: "control", name: "Контрольований переїзд", description: "Можеш поїхати на будь-яку клітинку поля. ❗ Якщо проїжджаєш «Старт» — +200 НЕ отримуєш"},
     {type: "control", name: "Контрольований переїзд", description: "Можеш поїхати на будь-яку клітинку поля. ❗ Якщо проїжджаєш «Старт» — +200 НЕ отримуєш"},
@@ -834,14 +918,78 @@ let transportCards = [
     {type: "pay", name: "Заплати ще", description: "Ви повинні заплатити додатково 100 ₴ за поїздку. Якщо не можете заплатити, повинні продати частину власності."}
 ];
 
+// Поточні дані гри
+let properties = [];
+let railroads = [];
+let utilities = [];
+let transportCards = [];
+
 // Ініціалізація
 function init() {
+    // Перевіряємо, чи є збережена гра
+    if (hasSavedGame()) {
+        showLoadGamePrompt();
+    } else {
+        startNewGame();
+    }
+}
+
+// Перевірка наявності збереженої гри
+function hasSavedGame() {
+    const savedPlayers = localStorage.getItem(STORAGE_KEYS.PLAYERS);
+    const savedProperties = localStorage.getItem(STORAGE_KEYS.PROPERTIES);
+    const savedVersion = localStorage.getItem(STORAGE_KEYS.GAME_VERSION);
+    
+    // Перевіряємо версію гри
+    if (savedVersion !== GAME_VERSION) {
+        console.log('Версія гри оновилась, очищаємо старе збереження');
+        clearSavedGame();
+        return false;
+    }
+    
+    return savedPlayers && savedProperties;
+}
+
+// Показати запит на завантаження гри
+function showLoadGamePrompt() {
+    const lastSaved = localStorage.getItem(STORAGE_KEYS.LAST_SAVED);
+    const lastSavedText = lastSaved ? `(останнє збереження: ${new Date(parseInt(lastSaved)).toLocaleString()})` : '';
+    
+    const content = `
+        <div style="text-align: left; padding: 20px;">
+            <h3>💾 Знайдено збережену гру!</h3>
+            <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                ${lastSavedText}
+            </div>
+            <div style="display: flex; gap: 15px; margin-top: 25px;">
+                <button onclick="loadGame(); closeCard();" style="flex: 1; padding: 15px; background: #4CAF50; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer;">
+                    📂 Завантажити гру
+                </button>
+                <button onclick="startNewGame(); closeCard();" style="flex: 1; padding: 15px; background: #ff9800; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer;">
+                    🆕 Почати нову
+                </button>
+            </div>
+        </div>
+    `;
+    
+    showCard('Завантажити збережену гру?', content);
+}
+
+// Почати нову гру
+function startNewGame() {
+    // Створюємо нову гру
     players = [
         {name: "Гравець 1", color: "#FF6B6B", money: 1500},
         {name: "Гравець 2", color: "#4ECDC4", money: 1500}
     ];
     
     transportCardsUsed = [];
+    
+    // Копіюємо шаблони
+    properties = JSON.parse(JSON.stringify(propertyTemplates));
+    railroads = JSON.parse(JSON.stringify(railroadTemplates));
+    utilities = JSON.parse(JSON.stringify(utilityTemplates));
+    transportCards = JSON.parse(JSON.stringify(transportCardTemplates));
     
     // Скидаємо власність
     properties.forEach(prop => {
@@ -863,6 +1011,158 @@ function init() {
     updateGame();
     populateRentCalculator();
     switchTab('streets');
+    
+    // Зберігаємо нову гру
+    saveGame();
+    showSaveNotification('Нова гра створена та збережена!');
+}
+
+// Завантажити гру
+function loadGame() {
+    try {
+        // Завантажуємо гравців
+        const savedPlayers = localStorage.getItem(STORAGE_KEYS.PLAYERS);
+        if (savedPlayers) {
+            players = JSON.parse(savedPlayers);
+        }
+        
+        // Завантажуємо вулиці
+        const savedProperties = localStorage.getItem(STORAGE_KEYS.PROPERTIES);
+        if (savedProperties) {
+            properties = JSON.parse(savedProperties);
+        }
+        
+        // Завантажуємо вокзали
+        const savedRailroads = localStorage.getItem(STORAGE_KEYS.RAILROADS);
+        if (savedRailroads) {
+            railroads = JSON.parse(savedRailroads);
+        }
+        
+        // Завантажуємо комунікації
+        const savedUtilities = localStorage.getItem(STORAGE_KEYS.UTILITIES);
+        if (savedUtilities) {
+            utilities = JSON.parse(savedUtilities);
+        }
+        
+        // Завантажуємо транспортні карти
+        const savedTransportCards = localStorage.getItem(STORAGE_KEYS.TRANSPORT_CARDS);
+        if (savedTransportCards) {
+            transportCardsUsed = JSON.parse(savedTransportCards);
+        }
+        
+        // Оновлюємо шаблони карт
+        transportCards = JSON.parse(JSON.stringify(transportCardTemplates));
+        
+        renderPlayers();
+        updateGame();
+        populateRentCalculator();
+        switchTab('streets');
+        
+        showSaveNotification('Гра завантажена!');
+        
+        // Оновлюємо індикатор автозбереження
+        const lastSaved = localStorage.getItem(STORAGE_KEYS.LAST_SAVED);
+        if (lastSaved) {
+            updateAutoSaveIndicator(new Date(parseInt(lastSaved)));
+        }
+        
+    } catch (error) {
+        console.error('Помилка завантаження гри:', error);
+        alert('Помилка завантаження гри. Почати нову гру?');
+        startNewGame();
+    }
+}
+
+// Зберегти гру
+function saveGame() {
+    try {
+        // Зберігаємо всі дані
+        localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(players));
+        localStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
+        localStorage.setItem(STORAGE_KEYS.RAILROADS, JSON.stringify(railroads));
+        localStorage.setItem(STORAGE_KEYS.UTILITIES, JSON.stringify(utilities));
+        localStorage.setItem(STORAGE_KEYS.TRANSPORT_CARDS, JSON.stringify(transportCardsUsed));
+        localStorage.setItem(STORAGE_KEYS.LAST_SAVED, Date.now().toString());
+        localStorage.setItem(STORAGE_KEYS.GAME_VERSION, GAME_VERSION);
+        
+        // Показуємо індикатор автозбереження
+        showAutoSaveIndicator();
+        
+    } catch (error) {
+        console.error('Помилка збереження гри:', error);
+    }
+}
+
+// Ручне збереження гри
+function saveGameManually() {
+    saveGame();
+    showSaveNotification('Гра збережена вручну!');
+}
+
+// Очистити збережену гру
+function clearSavedGame() {
+    Object.values(STORAGE_KEYS).forEach(key => {
+        localStorage.removeItem(key);
+    });
+}
+
+// Показати індикатор автозбереження
+function showAutoSaveIndicator() {
+    const indicator = document.getElementById('autoSaveIndicator');
+    const saveText = indicator.querySelector('.save-text');
+    
+    saveText.textContent = 'Автозбереження...';
+    indicator.style.display = 'flex';
+    
+    // Анімація
+    setTimeout(() => {
+        saveText.textContent = 'Збережено!';
+        setTimeout(() => {
+            indicator.style.display = 'none';
+        }, 1000);
+    }, 500);
+}
+
+// Оновити індикатор автозбереження
+function updateAutoSaveIndicator(lastSaveDate) {
+    const now = new Date();
+    const diffMs = now - lastSaveDate;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    let text;
+    if (diffMins < 1) {
+        text = 'Збережено щойно';
+    } else if (diffMins < 60) {
+        text = `Збережено ${diffMins} хв тому`;
+    } else if (diffMins < 1440) {
+        const hours = Math.floor(diffMins / 60);
+        text = `Збережено ${hours} год тому`;
+    } else {
+        const days = Math.floor(diffMins / 1440);
+        text = `Збережено ${days} дн тому`;
+    }
+    
+    const indicator = document.getElementById('autoSaveIndicator');
+    const saveText = indicator.querySelector('.save-text');
+    
+    saveText.textContent = text;
+    indicator.style.display = 'flex';
+    
+    // Ховаємо через 5 секунд
+    setTimeout(() => {
+        indicator.style.display = 'none';
+    }, 5000);
+}
+
+// Показати сповіщення про збереження
+function showSaveNotification(message) {
+    const notification = document.getElementById('saveNotification');
+    notification.textContent = message || '💾 Гра збережена!';
+    notification.style.display = 'block';
+    
+    setTimeout(() => {
+        notification.style.display = 'none';
+    }, 3000);
 }
 
 // Перемикання вкладок
@@ -912,8 +1212,8 @@ function renderPlayers() {
             <div class="player-item">
                 <div class="player-color" style="background-color: ${player.color}"></div>
                 <div class="player-inputs">
-                    <input value="${player.name}" onchange="players[${index}].name=this.value; updateGame()" placeholder="Ім'я гравця">
-                    <input type="number" value="${player.money}" onchange="players[${index}].money=parseInt(this.value); updateGame()" placeholder="Гроші">
+                    <input value="${player.name}" onchange="players[${index}].name=this.value; updateGameAndSave()" placeholder="Ім'я гравця">
+                    <input type="number" value="${player.money}" onchange="players[${index}].money=parseInt(this.value); updateGameAndSave()" placeholder="Гроші">
                 </div>
                 <button class="remove-player" onclick="removePlayer(${index})">×</button>
             </div>`;
@@ -934,7 +1234,7 @@ function addPlayer() {
     });
     
     renderPlayers();
-    updateGame();
+    updateGameAndSave();
     populateRentCalculator();
 }
 
@@ -967,7 +1267,7 @@ function removePlayer(index) {
         
         players.splice(index, 1);
         renderPlayers();
-        updateGame();
+        updateGameAndSave();
         populateRentCalculator();
     }
 }
@@ -1226,7 +1526,7 @@ function assignProperty(index, ownerName, type) {
         }
     }
     
-    updateGame();
+    updateGameAndSave();
 }
 
 // Звільнити власність
@@ -1241,7 +1541,7 @@ function freeProperty(index, type) {
         utilities[index].owner = null;
         utilities[index].mortgaged = false;
     }
-    updateGame();
+    updateGameAndSave();
 }
 
 // Додати будинок
@@ -1250,7 +1550,7 @@ function addHouse(index) {
     
     if (property.houses < 4 && checkMonopoly(property.group, property.owner)) {
         property.houses++;
-        updateGame();
+        updateGameAndSave();
     }
 }
 
@@ -1260,7 +1560,7 @@ function removeHouse(index) {
     
     if (property.houses > 0) {
         property.houses--;
-        updateGame();
+        updateGameAndSave();
     }
 }
 
@@ -1270,7 +1570,7 @@ function addHotel(index) {
     
     if (property.houses === 4 && checkMonopoly(property.group, property.owner)) {
         property.houses = 5;
-        updateGame();
+        updateGameAndSave();
     }
 }
 
@@ -1285,7 +1585,7 @@ function toggleMortgage(index, type) {
     }
     
     item.mortgaged = !item.mortgaged;
-    updateGame();
+    updateGameAndSave();
 }
 
 // Перевірити монополію
@@ -1716,6 +2016,9 @@ function drawTransportCard() {
     const originalIndex = transportCards.findIndex(c => c === card);
     transportCardsUsed.push(originalIndex);
     
+    // Зберігаємо стан карт
+    saveGame();
+    
     // Створюємо інформацію про картку
     let cardInfo = `
         <div style="text-align: left;">
@@ -1924,7 +2227,8 @@ function calculateRentForSelected() {
 // Скинути гру
 function resetGame() {
     if (confirm("Розпочати нову гру? Усі поточні дані будуть втрачені.")) {
-        init();
+        clearSavedGame();
+        startNewGame();
     }
 }
 
@@ -2108,6 +2412,12 @@ function getGroupName(groupKey) {
     return groupNames[groupKey] || groupKey;
 }
 
+// Оновити гру і зберегти
+function updateGameAndSave() {
+    updateGame();
+    saveGame();
+}
+
 // Оновити всю гру
 function updateGame() {
     renderStreets();
@@ -2119,6 +2429,20 @@ function updateGame() {
 
 // Ініціалізація при завантаженні
 window.onload = init;
+
+// Автозбереження при закритті сторінки
+window.addEventListener('beforeunload', function(e) {
+    saveGame();
+});
+
+// Автозбереження при зміні вмісту
+document.addEventListener('input', function(e) {
+    // Автозбереження тільки для певних елементів
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+        // Затримка, щоб уникнути занадто частого збереження
+        setTimeout(saveGame, 1000);
+    }
+});
 </script>
 </body>
 </html>
