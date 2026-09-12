@@ -1126,9 +1126,17 @@ let roomCode = '';
 let myPlayerId = '';
 let remoteState = null;
 const roomConnections = new Map();
+const ONLINE_SESSION_KEY = 'monopolia_online_session_v1';
+let reconnectTimer = null;
 
 function makePlayerId() { return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`).slice(0, 12); }
 function lobbyError(message) { document.getElementById('lobbyMessage').textContent = message; }
+function saveOnlineSession(name) {
+    localStorage.setItem(ONLINE_SESSION_KEY, JSON.stringify({role:onlineRole, roomCode, playerId:myPlayerId, name, savedAt:Date.now()}));
+}
+function getOnlineSession() {
+    try { return JSON.parse(localStorage.getItem(ONLINE_SESSION_KEY) || 'null'); } catch { return null; }
+}
 function requireLobbyName() {
     const name = document.getElementById('lobbyName').value.replace(/[<>\'"`\\]/g, '').trim();
     if (!name) lobbyError('Спочатку введи своє імʼя');
@@ -1171,6 +1179,7 @@ function createOnlineRoom() {
         startNewGame();
         players = [{id: makePlayerId(), name, color:'#FF6B6B', money:1500}];
         myPlayerId = players[0].id;
+        saveOnlineSession(name);
         renderPlayers(); updateGameAndSave();
         document.getElementById('roomLobby').classList.add('hidden');
         updateRoomStatus();
@@ -1188,16 +1197,35 @@ function joinOnlineRoom() {
     if (!name || !/^\d{4}$/.test(code)) return lobbyError('Введи чотиризначний код кімнати');
     if (!ensurePeerJs()) return;
     roomCode = code; onlineRole = 'player'; myPlayerId = makePlayerId();
+    saveOnlineSession(name);
     lobbyError('Підключення…');
+    connectAsPlayer(name);
+}
+
+function connectAsPlayer(name) {
+    if (onlinePeer && !onlinePeer.destroyed) onlinePeer.destroy();
     onlinePeer = new Peer();
-    onlinePeer.on('open', () => {
-        hostConnection = onlinePeer.connect(`monopolia-${code}`, {reliable:true});
-        hostConnection.on('open', () => hostConnection.send({type:'join', player:{id:myPlayerId, name}}));
-        hostConnection.on('data', handlePlayerMessage);
-        hostConnection.on('close', () => showPlayerConnectionError('Банкір відключився'));
-        hostConnection.on('error', () => showPlayerConnectionError('Зʼєднання втрачено'));
-    });
+    onlinePeer.on('open', () => connectToBanker(name));
     onlinePeer.on('error', () => lobbyError('Кімнату не знайдено або банкір не в мережі'));
+}
+
+function connectToBanker(name) {
+    if (hostConnection?.open) return;
+    hostConnection = onlinePeer.connect(`monopolia-${roomCode}`, {reliable:true});
+    hostConnection.on('open', () => {
+        clearTimeout(reconnectTimer);
+        hostConnection.send({type:'join', player:{id:myPlayerId, name}});
+    });
+    hostConnection.on('data', handlePlayerMessage);
+    hostConnection.on('close', () => schedulePlayerReconnect(name));
+    hostConnection.on('error', () => schedulePlayerReconnect(name));
+}
+
+function schedulePlayerReconnect(name) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => {
+        if (document.visibilityState === 'visible' && navigator.onLine) connectAsPlayer(name);
+    }, 1200);
 }
 
 function bindRoomConnection(connection) {
@@ -1205,6 +1233,15 @@ function bindRoomConnection(connection) {
         if (message.type === 'join') {
             const requested = message.player;
             if (!requested?.id || !requested?.name) return;
+            const returningPlayer = players.find(player => player.id === requested.id);
+            if (returningPlayer) {
+                connection.playerId = returningPlayer.id;
+                roomConnections.set(returningPlayer.id, connection);
+                connection.send({type:'joined', playerId:returningPlayer.id});
+                connection.send({type:'state', state:roomSnapshot()});
+                updateRoomStatus();
+                return;
+            }
             if (players.some(player => player.name.toLowerCase() === requested.name.toLowerCase())) {
                 connection.send({type:'error', message:'Це імʼя вже зайняте'}); return;
             }
@@ -1235,7 +1272,7 @@ function handlePlayerMessage(message) {
 function updateRoomStatus() {
     if (onlineRole !== 'banker') return;
     const banker = players.find(player => player.id === myPlayerId);
-    document.getElementById('roomStatus').innerHTML = `<span class="room-code">КІМНАТА ${roomCode}</span> · ${players.length} гравців · ти банкір`;
+    document.getElementById('roomStatus').innerHTML = `<span class="room-code">КІМНАТА ${roomCode}</span> · ${players.length} гравців · ти банкір <button class="small" style="display:inline-flex;width:auto;background:transparent" onclick="leaveOnlineRoom()">Вийти</button>`;
     const wallet = document.getElementById('bankerWallet');
     wallet.classList.add('visible');
     wallet.innerHTML = `<div class="banker-balance"><small>Твій особистий баланс</small><strong>${banker?.money ?? 0} ₴</strong></div><button onclick="openPaymentPicker()">Заплатити гравцю</button><button class="warning" onclick="openPaymentAmount('bank','Банк')">Заплатити банку</button>`;
@@ -1247,13 +1284,62 @@ function renderPlayerDashboard() {
     if (!me) return showPlayerConnectionError('Гравця видалено з кімнати');
     const owned = [...remoteState.properties, ...remoteState.railroads, ...remoteState.utilities].filter(item => item.owner === me.name);
     document.getElementById('playerDashboard').classList.remove('hidden');
-    document.getElementById('playerDashboard').innerHTML = `<div class="player-shell"><div class="player-head"><div><small>Кімната ${remoteState.roomCode}</small><h2 style="text-align:left;margin:4px 0">${escapeHtml(me.name)}</h2></div><span class="room-code">ГРАВЕЦЬ</span></div>
+    document.getElementById('playerDashboard').innerHTML = `<div class="player-shell"><div class="player-head"><div><small>Кімната ${remoteState.roomCode}</small><h2 style="text-align:left;margin:4px 0">${escapeHtml(me.name)}</h2></div><button class="small" style="width:auto;background:rgba(255,255,255,.1)" onclick="leaveOnlineRoom()">Вийти</button></div>
         <div class="balance-card"><small>Твій баланс</small><div class="balance-value">${me.money} ₴</div></div>
         <div class="pay-grid"><button onclick="openPaymentPicker()">Заплатити гравцю</button><button class="warning" onclick="openPaymentAmount('bank','Банк')">Заплатити банку</button></div>
         <section class="player-section"><h3>Гравці</h3><div class="remote-list">${remoteState.players.filter(player => player.id !== myPlayerId).map(player => `<div class="remote-row"><span><i class="owner-dot" style="background:${player.color}"></i>${escapeHtml(player.name)} · ${player.money} ₴</span><button onclick="openPaymentAmount('${player.id}','${escapeHtml(player.name)}')">Платити</button></div>`).join('')}</div></section>
         <section class="player-section"><h3>Моя власність · ${owned.length}</h3><div class="remote-list">${owned.length ? owned.map(item => `<div class="remote-row"><span>${escapeHtml(item.name)}</span><strong>${item.price} ₴</strong></div>`).join('') : '<div class="remote-row">Поки немає власності</div>'}</div></section></div>`;
 }
 function showPlayerConnectionError(message) { document.getElementById('playerDashboard').innerHTML = `<div class="player-shell"><div class="balance-card"><h2>${message}</h2><button onclick="location.reload()">Повернутися</button></div></div>`; }
+
+function resumeOnlineSession() {
+    const session = getOnlineSession();
+    if (!session?.role || !session?.roomCode || !session?.playerId || !session?.name || !ensurePeerJs()) return false;
+    onlineRole = session.role; roomCode = session.roomCode; myPlayerId = session.playerId;
+    document.getElementById('roomLobby').classList.add('hidden');
+    if (onlineRole === 'banker') {
+        if (hasSavedGame()) loadGame(); else startNewGame();
+        let banker = players.find(player => player.id === myPlayerId) || players.find(player => player.name === session.name);
+        if (!banker) { banker = {id:myPlayerId,name:session.name,color:'#FF6B6B',money:1500}; players.unshift(banker); }
+        banker.id = myPlayerId;
+        connectAsBankerAfterWake();
+    } else {
+        document.body.classList.add('player-mode');
+        document.getElementById('playerDashboard').classList.remove('hidden');
+        showPlayerConnectionError('Відновлюємо зʼєднання…');
+        connectAsPlayer(session.name);
+    }
+    return true;
+}
+
+function connectAsBankerAfterWake() {
+    if (onlinePeer && !onlinePeer.destroyed) onlinePeer.destroy();
+    onlinePeer = new Peer(`monopolia-${roomCode}`);
+    onlinePeer.on('open', () => { clearTimeout(reconnectTimer); updateRoomStatus(); broadcastRoomState(); });
+    onlinePeer.on('connection', bindRoomConnection);
+    onlinePeer.on('disconnected', restoreConnectionAfterWake);
+    onlinePeer.on('error', error => {
+        if (error.type === 'unavailable-id') {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(connectAsBankerAfterWake, 2500);
+        }
+    });
+}
+
+function restoreConnectionAfterWake() {
+    const session = getOnlineSession();
+    if (!session || document.visibilityState !== 'visible') return;
+    if (onlineRole === 'player' && !hostConnection?.open) connectAsPlayer(session.name);
+    if (onlineRole === 'banker' && onlinePeer?.disconnected && !onlinePeer.destroyed) {
+        try { onlinePeer.reconnect(); } catch {}
+    }
+}
+function leaveOnlineRoom() {
+    if (!confirm('Вийти з цієї кімнати?')) return;
+    localStorage.removeItem(ONLINE_SESSION_KEY);
+    if (onlinePeer && !onlinePeer.destroyed) onlinePeer.destroy();
+    location.reload();
+}
 
 function openPaymentPicker() {
     const state = onlineRole === 'banker' ? roomSnapshot() : remoteState;
@@ -2756,7 +2842,9 @@ function updateGame() {
 }
 
 // Ініціалізація при завантаженні
-window.onload = () => {};
+window.onload = () => { resumeOnlineSession(); };
+document.addEventListener('visibilitychange', restoreConnectionAfterWake);
+window.addEventListener('online', restoreConnectionAfterWake);
 
 // Автозбереження при закритті сторінки
 window.addEventListener('beforeunload', function(e) {
