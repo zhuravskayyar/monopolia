@@ -777,6 +777,32 @@ h1 small { display: block; margin-top: 4px; font-size: .48em; font-weight: 500; 
 .group-street-actions button { margin: 0; padding: 8px; height: 38px; }
 .group-street-actions span { text-align: center; font-weight: 700; font-size: .78rem; }
 
+.room-lobby { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 18px; background: radial-gradient(circle at 20% 0%, #2c5d4a, #10271f 64%); color: white; }
+.room-lobby.hidden, .player-dashboard.hidden { display: none; }
+.lobby-card { width: min(100%, 420px); padding: 24px; border: 1px solid rgba(255,255,255,.14); border-radius: 24px; background: rgba(255,255,255,.08); box-shadow: 0 24px 70px rgba(0,0,0,.32); backdrop-filter: blur(16px); }
+.lobby-card h1 { padding: 0; text-align: center; }
+.lobby-card p { color: #c9d8d1; text-align: center; line-height: 1.45; }
+.lobby-card input { min-height: 52px; font-size: 1rem; }
+.lobby-actions { display: grid; gap: 8px; margin-top: 14px; }
+.room-code { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,.12); color: white; font-weight: 800; letter-spacing: .08em; }
+.room-status { max-width: 980px; margin: 0 auto 7px; color: #c9d8d1; font-size: .8rem; }
+.player-dashboard { min-height: 100dvh; padding: 18px 12px 28px; color: white; background: radial-gradient(circle at 20% 0%, #2c5d4a, #10271f 64%); }
+body.player-mode { padding: 0; background: #10271f; }
+body.player-mode > .header, body.player-mode > .room-status, body.player-mode > .tab-buttons, body.player-mode > .container, body.player-mode > .mobile-menu, body.player-mode > .auto-save-indicator { display: none !important; }
+.player-shell { max-width: 520px; margin: auto; }
+.player-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.balance-card { margin: 18px 0 12px; padding: 22px; border-radius: 22px; color: var(--ink); background: var(--paper); }
+.balance-card small { color: var(--muted); }
+.balance-value { margin-top: 5px; font-size: 2.4rem; font-weight: 850; letter-spacing: -.04em; }
+.pay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pay-grid button { margin: 0; min-height: 58px; }
+.player-section { margin-top: 16px; }
+.player-section h3 { text-align: left; font-size: 1rem; color: #d9e5df; }
+.remote-list { display: grid; gap: 7px; }
+.remote-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 13px; background: rgba(255,255,255,.09); }
+.remote-row button { width: auto; margin: 0; padding: 8px 11px; }
+.payment-amount { font-size: 2rem; text-align: center; font-weight: 800; }
+
 .property-item {
     margin-bottom: 8px;
     padding: 0;
@@ -848,9 +874,26 @@ button:disabled { opacity: .38; cursor: not-allowed; }
 
 <body>
 
+<div id="roomLobby" class="room-lobby">
+    <div class="lobby-card">
+        <h1>Монополія</h1>
+        <p>Спільний банк і власність на телефонах усіх гравців.</p>
+        <input id="lobbyName" maxlength="20" placeholder="Твоє імʼя" autocomplete="name">
+        <div id="joinFields" class="hidden"><input id="joinCode" inputmode="numeric" maxlength="4" placeholder="Код кімнати"></div>
+        <div class="lobby-actions" id="lobbyActions">
+            <button onclick="createOnlineRoom()">Створити кімнату · я банкір</button>
+            <button class="secondary" onclick="showJoinRoom()">Увійти за кодом</button>
+        </div>
+        <div id="lobbyMessage" style="margin-top:12px;text-align:center;color:#d9e5df"></div>
+    </div>
+</div>
+
+<div id="playerDashboard" class="player-dashboard hidden"></div>
+
 <div class="header">
     <h1>Монополія <small>Швидкий облік власності під час гри</small></h1>
 </div>
+<div id="roomStatus" class="room-status"></div>
 
 <div class="auto-save-indicator" id="autoSaveIndicator">
     <span class="save-icon">💾</span>
@@ -1011,6 +1054,7 @@ button:disabled { opacity: .38; cursor: not-allowed; }
     <button onclick="closeCard()">Закрити</button>
 </div>
 
+<script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
 <script>
 // Ключі для localStorage
 const STORAGE_KEYS = {
@@ -1033,6 +1077,149 @@ let propertySearch = '';
 let ownerFilter = 'all';
 let groupFilter = 'all';
 let undoStack = [];
+let onlineRole = null;
+let onlinePeer = null;
+let hostConnection = null;
+let roomCode = '';
+let myPlayerId = '';
+let remoteState = null;
+const roomConnections = new Map();
+
+function makePlayerId() { return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`).slice(0, 12); }
+function lobbyError(message) { document.getElementById('lobbyMessage').textContent = message; }
+function requireLobbyName() {
+    const name = document.getElementById('lobbyName').value.replace(/[<>\'"`\\]/g, '').trim();
+    if (!name) lobbyError('Спочатку введи своє імʼя');
+    return name;
+}
+function showJoinRoom() {
+    document.getElementById('joinFields').classList.remove('hidden');
+    document.getElementById('lobbyActions').innerHTML = `<button onclick="joinOnlineRoom()">Підключитися</button><button class="secondary" onclick="location.reload()">Назад</button>`;
+    document.getElementById('joinCode').focus();
+}
+function ensurePeerJs() {
+    if (window.Peer) return true;
+    lobbyError('Не вдалося завантажити зʼєднання. Перевір інтернет і онови сторінку.');
+    return false;
+}
+
+function createOnlineRoom() {
+    const name = requireLobbyName();
+    if (!name || !ensurePeerJs()) return;
+    lobbyError('Створюємо кімнату…');
+    roomCode = String(Math.floor(1000 + Math.random() * 9000));
+    onlineRole = 'banker';
+    onlinePeer = new Peer(`monopolia-${roomCode}`);
+    onlinePeer.on('open', () => {
+        startNewGame();
+        players = [{id: makePlayerId(), name, color:'#FF6B6B', money:1500}];
+        myPlayerId = players[0].id;
+        renderPlayers(); updateGameAndSave();
+        document.getElementById('roomLobby').classList.add('hidden');
+        updateRoomStatus();
+    });
+    onlinePeer.on('connection', bindRoomConnection);
+    onlinePeer.on('error', error => {
+        if (error.type === 'unavailable-id') return createOnlineRoom();
+        lobbyError('Не вдалося створити кімнату. Онови сторінку і спробуй ще раз.');
+    });
+}
+
+function joinOnlineRoom() {
+    const name = requireLobbyName();
+    const code = document.getElementById('joinCode').value.trim();
+    if (!name || !/^\d{4}$/.test(code)) return lobbyError('Введи чотиризначний код кімнати');
+    if (!ensurePeerJs()) return;
+    roomCode = code; onlineRole = 'player'; myPlayerId = makePlayerId();
+    lobbyError('Підключення…');
+    onlinePeer = new Peer();
+    onlinePeer.on('open', () => {
+        hostConnection = onlinePeer.connect(`monopolia-${code}`, {reliable:true});
+        hostConnection.on('open', () => hostConnection.send({type:'join', player:{id:myPlayerId, name}}));
+        hostConnection.on('data', handlePlayerMessage);
+        hostConnection.on('close', () => showPlayerConnectionError('Банкір відключився'));
+        hostConnection.on('error', () => showPlayerConnectionError('Зʼєднання втрачено'));
+    });
+    onlinePeer.on('error', () => lobbyError('Кімнату не знайдено або банкір не в мережі'));
+}
+
+function bindRoomConnection(connection) {
+    connection.on('data', message => {
+        if (message.type === 'join') {
+            const requested = message.player;
+            if (!requested?.id || !requested?.name) return;
+            if (players.some(player => player.name.toLowerCase() === requested.name.toLowerCase())) {
+                connection.send({type:'error', message:'Це імʼя вже зайняте'}); return;
+            }
+            const colors = ['#4ECDC4','#FFD166','#06D6A0','#118AB2','#EF476F','#7209B7','#F15BB5'];
+            const player = {id:requested.id, name:requested.name.slice(0,20), color:colors[(players.length - 1) % colors.length], money:1500};
+            players.push(player); connection.playerId = player.id; roomConnections.set(player.id, connection);
+            renderPlayers(); updateGameAndSave(); connection.send({type:'joined', playerId:player.id}); broadcastRoomState(); updateRoomStatus();
+        } else if (message.type === 'transfer' && connection.playerId) {
+            processTransfer(connection.playerId, message.targetId, Number(message.amount), connection);
+        }
+    });
+    connection.on('close', () => { if (connection.playerId) roomConnections.delete(connection.playerId); updateRoomStatus(); });
+}
+
+function roomSnapshot() { return {players, properties, railroads, utilities, roomCode, bankerId:myPlayerId}; }
+function broadcastRoomState() {
+    if (onlineRole !== 'banker') return;
+    const message = {type:'state', state:roomSnapshot()};
+    roomConnections.forEach(connection => { if (connection.open) connection.send(message); });
+    updateRoomStatus();
+}
+function handlePlayerMessage(message) {
+    if (message.type === 'error') return lobbyError(message.message);
+    if (message.type === 'joined') { document.getElementById('roomLobby').classList.add('hidden'); document.body.classList.add('player-mode'); }
+    if (message.type === 'state') { remoteState = message.state; renderPlayerDashboard(); }
+    if (message.type === 'notice') showSaveNotification(message.message);
+}
+function updateRoomStatus() {
+    if (onlineRole !== 'banker') return;
+    document.getElementById('roomStatus').innerHTML = `<span class="room-code">КІМНАТА ${roomCode}</span> · ${players.length} гравців <button class="small" style="display:inline-flex;width:auto" onclick="openPaymentPicker()">Переказ</button>`;
+}
+
+function renderPlayerDashboard() {
+    if (!remoteState) return;
+    const me = remoteState.players.find(player => player.id === myPlayerId);
+    if (!me) return showPlayerConnectionError('Гравця видалено з кімнати');
+    const owned = [...remoteState.properties, ...remoteState.railroads, ...remoteState.utilities].filter(item => item.owner === me.name);
+    document.getElementById('playerDashboard').classList.remove('hidden');
+    document.getElementById('playerDashboard').innerHTML = `<div class="player-shell"><div class="player-head"><div><small>Кімната ${remoteState.roomCode}</small><h2 style="text-align:left;margin:4px 0">${escapeHtml(me.name)}</h2></div><span class="room-code">ГРАВЕЦЬ</span></div>
+        <div class="balance-card"><small>Твій баланс</small><div class="balance-value">${me.money} ₴</div></div>
+        <div class="pay-grid"><button onclick="openPaymentPicker()">Заплатити гравцю</button><button class="warning" onclick="openPaymentAmount('bank','Банк')">Заплатити банку</button></div>
+        <section class="player-section"><h3>Гравці</h3><div class="remote-list">${remoteState.players.filter(player => player.id !== myPlayerId).map(player => `<div class="remote-row"><span><i class="owner-dot" style="background:${player.color}"></i>${escapeHtml(player.name)} · ${player.money} ₴</span><button onclick="openPaymentAmount('${player.id}','${escapeHtml(player.name)}')">Платити</button></div>`).join('')}</div></section>
+        <section class="player-section"><h3>Моя власність · ${owned.length}</h3><div class="remote-list">${owned.length ? owned.map(item => `<div class="remote-row"><span>${escapeHtml(item.name)}</span><strong>${item.price} ₴</strong></div>`).join('') : '<div class="remote-row">Поки немає власності</div>'}</div></section></div>`;
+}
+function showPlayerConnectionError(message) { document.getElementById('playerDashboard').innerHTML = `<div class="player-shell"><div class="balance-card"><h2>${message}</h2><button onclick="location.reload()">Повернутися</button></div></div>`; }
+
+function openPaymentPicker() {
+    const state = onlineRole === 'banker' ? roomSnapshot() : remoteState;
+    const targets = state.players.filter(player => player.id !== myPlayerId);
+    showCard('Кому заплатити?', `<div class="remote-list">${targets.map(player => `<button onclick="openPaymentAmount('${player.id}','${escapeHtml(player.name)}')">${escapeHtml(player.name)} · ${player.money} ₴</button>`).join('')}${onlineRole !== 'banker' ? '<button class="warning" onclick="openPaymentAmount(\'bank\',\'Банк\')">Банку</button>' : ''}</div>`);
+}
+function openPaymentAmount(targetId, targetName) {
+    showCard(`Платіж: ${targetName}`, `<input id="paymentAmount" class="payment-amount" type="number" min="1" inputmode="numeric" placeholder="0"><button class="success" onclick="confirmPayment('${targetId}')">Переказати</button>`);
+    setTimeout(() => document.getElementById('paymentAmount')?.focus(), 50);
+}
+function confirmPayment(targetId) {
+    const amount = Number(document.getElementById('paymentAmount')?.value);
+    if (!Number.isInteger(amount) || amount <= 0) return alert('Введи правильну суму');
+    if (onlineRole === 'banker') processTransfer(myPlayerId, targetId, amount); else hostConnection.send({type:'transfer', targetId, amount});
+    closeCard();
+}
+function processTransfer(fromId, targetId, amount, replyConnection) {
+    const sender = players.find(player => player.id === fromId);
+    const target = players.find(player => player.id === targetId);
+    if (!sender || !Number.isInteger(amount) || amount <= 0 || sender.money < amount || (targetId !== 'bank' && !target)) {
+        replyConnection?.send({type:'notice', message:'Платіж відхилено: перевір суму'}); return;
+    }
+    sender.money -= amount; if (target) target.money += amount;
+    renderPlayers(); updateGameAndSave(); broadcastRoomState();
+    const message = `${sender.name} → ${target ? target.name : 'Банк'}: ${amount} ₴`;
+    showSaveNotification(message); replyConnection?.send({type:'notice', message});
+}
 
 // Шаблони власності (для ініціалізації)
 const propertyTemplates = [
@@ -1153,8 +1340,8 @@ function showLoadGamePrompt() {
 function startNewGame() {
     // Створюємо нову гру
     players = [
-        {name: "Гравець 1", color: "#FF6B6B", money: 1500},
-        {name: "Гравець 2", color: "#4ECDC4", money: 1500}
+        {id: makePlayerId(), name: "Гравець 1", color: "#FF6B6B", money: 1500},
+        {id: makePlayerId(), name: "Гравець 2", color: "#4ECDC4", money: 1500}
     ];
     
     transportCardsUsed = [];
@@ -1423,6 +1610,7 @@ function addPlayer() {
     const playerNum = players.length + 1;
     
     players.push({
+        id: makePlayerId(),
         name: `Гравець ${playerNum}`,
         color: colors[players.length % colors.length],
         money: 1500
@@ -2479,6 +2667,7 @@ function getGroupName(groupKey) {
 function updateGameAndSave() {
     updateGame();
     saveGame();
+    broadcastRoomState();
 }
 
 // Оновити всю гру
@@ -2491,7 +2680,7 @@ function updateGame() {
 }
 
 // Ініціалізація при завантаженні
-window.onload = init;
+window.onload = () => document.getElementById('lobbyName').focus();
 
 // Автозбереження при закритті сторінки
 window.addEventListener('beforeunload', function(e) {
