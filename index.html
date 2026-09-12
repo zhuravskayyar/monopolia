@@ -792,6 +792,11 @@ h1 small { display: block; margin-top: 4px; font-size: .48em; font-weight: 500; 
 .lobby-step-title { margin: 4px 0 14px; font-size: 1.15rem; text-align: center; }
 .room-code { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,.12); color: white; font-weight: 800; letter-spacing: .08em; }
 .room-status { max-width: 980px; margin: 0 auto 7px; color: #c9d8d1; font-size: .8rem; }
+.banker-wallet { display: none; max-width: 980px; margin: 8px auto 12px; padding: 12px; border-radius: 16px; background: rgba(255,255,255,.1); color: white; border: 1px solid rgba(255,255,255,.12); }
+.banker-wallet.visible { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; }
+.banker-balance small { display: block; color: #c9d8d1; font-size: .7rem; }
+.banker-balance strong { font-size: 1.35rem; }
+.banker-wallet button { width: auto; margin: 0; padding: 10px 13px; white-space: nowrap; }
 .player-dashboard { min-height: 100dvh; padding: 18px 12px 28px; color: white; background: radial-gradient(circle at 20% 0%, #2c5d4a, #10271f 64%); }
 body.player-mode { padding: 0; background: #10271f; }
 body.player-mode > .header, body.player-mode > .room-status, body.player-mode > .tab-buttons, body.player-mode > .container, body.player-mode > .mobile-menu, body.player-mode > .auto-save-indicator { display: none !important; }
@@ -893,6 +898,10 @@ button:disabled { opacity: .38; cursor: not-allowed; }
     .group-board { width: 100%; grid-template-rows: repeat(4, minmax(0, 1fr)); }
     .group-tile { height: auto; min-height: 0; }
     #streetStats { display: none; }
+    .banker-wallet.visible { grid-template-columns: 1fr 1fr; }
+    .banker-balance { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: end; }
+    .banker-wallet button { width: 100%; font-size: .78rem; }
+    #streets-box { height: calc(100dvh - 244px); }
 }
 </style>
 </head>
@@ -926,6 +935,7 @@ button:disabled { opacity: .38; cursor: not-allowed; }
     <h1>Монополія <small>Швидкий облік власності під час гри</small></h1>
 </div>
 <div id="roomStatus" class="room-status"></div>
+<div id="bankerWallet" class="banker-wallet"></div>
 
 <div class="auto-save-indicator" id="autoSaveIndicator">
     <span class="save-icon">💾</span>
@@ -1224,7 +1234,11 @@ function handlePlayerMessage(message) {
 }
 function updateRoomStatus() {
     if (onlineRole !== 'banker') return;
-    document.getElementById('roomStatus').innerHTML = `<span class="room-code">КІМНАТА ${roomCode}</span> · ${players.length} гравців <button class="small" style="display:inline-flex;width:auto" onclick="openPaymentPicker()">Переказ</button>`;
+    const banker = players.find(player => player.id === myPlayerId);
+    document.getElementById('roomStatus').innerHTML = `<span class="room-code">КІМНАТА ${roomCode}</span> · ${players.length} гравців · ти банкір`;
+    const wallet = document.getElementById('bankerWallet');
+    wallet.classList.add('visible');
+    wallet.innerHTML = `<div class="banker-balance"><small>Твій особистий баланс</small><strong>${banker?.money ?? 0} ₴</strong></div><button onclick="openPaymentPicker()">Заплатити гравцю</button><button class="warning" onclick="openPaymentAmount('bank','Банк')">Заплатити банку</button>`;
 }
 
 function renderPlayerDashboard() {
