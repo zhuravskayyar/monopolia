@@ -784,6 +784,12 @@ h1 small { display: block; margin-top: 4px; font-size: .48em; font-weight: 500; 
 .lobby-card p { color: #c9d8d1; text-align: center; line-height: 1.45; }
 .lobby-card input { min-height: 52px; font-size: 1rem; }
 .lobby-actions { display: grid; gap: 8px; margin-top: 14px; }
+.role-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+.role-card { min-height: 132px; margin: 0; padding: 16px 10px; flex-direction: column; border: 1px solid rgba(255,255,255,.13); background: rgba(255,255,255,.09); }
+.role-card span { font-size: 2rem; }
+.role-card strong { font-size: 1rem; }
+.role-card small { color: #c9d8d1; font-weight: 500; }
+.lobby-step-title { margin: 4px 0 14px; font-size: 1.15rem; text-align: center; }
 .room-code { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,.12); color: white; font-weight: 800; letter-spacing: .08em; }
 .room-status { max-width: 980px; margin: 0 auto 7px; color: #c9d8d1; font-size: .8rem; }
 .player-dashboard { min-height: 100dvh; padding: 18px 12px 28px; color: white; background: radial-gradient(circle at 20% 0%, #2c5d4a, #10271f 64%); }
@@ -896,12 +902,19 @@ button:disabled { opacity: .38; cursor: not-allowed; }
 <div id="roomLobby" class="room-lobby">
     <div class="lobby-card">
         <h1>Монополія</h1>
-        <p>Спільний банк і власність на телефонах усіх гравців.</p>
-        <input id="lobbyName" maxlength="20" placeholder="Твоє імʼя" autocomplete="name">
-        <div id="joinFields" class="hidden"><input id="joinCode" inputmode="numeric" maxlength="4" placeholder="Код кімнати"></div>
-        <div class="lobby-actions" id="lobbyActions">
-            <button onclick="createOnlineRoom()">Створити кімнату · я банкір</button>
-            <button class="secondary" onclick="showJoinRoom()">Увійти за кодом</button>
+        <p id="lobbyIntro">Спільний банк і власність на телефонах усіх гравців.</p>
+        <div id="roleStep">
+            <div class="lobby-step-title">Хто ти в цій грі?</div>
+            <div class="role-choice">
+                <button class="role-card" onclick="chooseLobbyRole('banker')"><span>🏦</span><strong>Я банкір</strong><small>Створити кімнату</small></button>
+                <button class="role-card" onclick="chooseLobbyRole('player')"><span>🎩</span><strong>Я гравець</strong><small>Увійти за кодом</small></button>
+            </div>
+        </div>
+        <div id="detailsStep" class="hidden">
+            <div id="selectedRoleTitle" class="lobby-step-title"></div>
+            <input id="lobbyName" maxlength="20" placeholder="Твоє імʼя" autocomplete="name">
+            <div id="joinFields" class="hidden"><input id="joinCode" inputmode="numeric" maxlength="4" placeholder="Код кімнати"></div>
+            <div class="lobby-actions" id="lobbyActions"></div>
         </div>
         <div id="lobbyMessage" style="margin-top:12px;text-align:center;color:#d9e5df"></div>
     </div>
@@ -1115,6 +1128,21 @@ function showJoinRoom() {
     document.getElementById('joinFields').classList.remove('hidden');
     document.getElementById('lobbyActions').innerHTML = `<button onclick="joinOnlineRoom()">Підключитися</button><button class="secondary" onclick="location.reload()">Назад</button>`;
     document.getElementById('joinCode').focus();
+}
+function chooseLobbyRole(role) {
+    document.getElementById('roleStep').classList.add('hidden');
+    document.getElementById('detailsStep').classList.remove('hidden');
+    document.getElementById('selectedRoleTitle').textContent = role === 'banker' ? 'Створення кімнати' : 'Вхід у кімнату';
+    document.getElementById('joinFields').classList.toggle('hidden', role !== 'player');
+    document.getElementById('lobbyActions').innerHTML = role === 'banker'
+        ? `<button onclick="createOnlineRoom()">Створити кімнату</button><button class="secondary" onclick="resetLobbyRole()">Назад</button>`
+        : `<button onclick="joinOnlineRoom()">Увійти в кімнату</button><button class="secondary" onclick="resetLobbyRole()">Назад</button>`;
+    document.getElementById('lobbyName').focus();
+}
+function resetLobbyRole() {
+    document.getElementById('detailsStep').classList.add('hidden');
+    document.getElementById('roleStep').classList.remove('hidden');
+    lobbyError('');
 }
 function ensurePeerJs() {
     if (window.Peer) return true;
@@ -2714,7 +2742,7 @@ function updateGame() {
 }
 
 // Ініціалізація при завантаженні
-window.onload = () => document.getElementById('lobbyName').focus();
+window.onload = () => {};
 
 // Автозбереження при закритті сторінки
 window.addEventListener('beforeunload', function(e) {
