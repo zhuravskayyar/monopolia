@@ -802,6 +802,25 @@ body.player-mode > .header, body.player-mode > .room-status, body.player-mode > 
 .remote-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 13px; background: rgba(255,255,255,.09); }
 .remote-row button { width: auto; margin: 0; padding: 8px 11px; }
 .payment-amount { font-size: 2rem; text-align: center; font-weight: 800; }
+.card.payment-mode { top: auto; bottom: 0; transform: translateX(-50%); width: min(100%, 520px); max-width: 520px; min-width: 0; border-radius: 26px 26px 0 0; padding: 14px 16px calc(18px + env(safe-area-inset-bottom)); animation: walletUp .28s ease; }
+.card.payment-mode > h2 { font-size: 1rem; margin: 4px 0 12px; color: var(--muted); }
+.card.payment-mode > button:last-child { display: none; }
+@keyframes walletUp { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
+.wallet-card { position: relative; overflow: hidden; min-height: 178px; padding: 20px; border-radius: 22px; color: white; text-align: left; background: radial-gradient(circle at 88% 0%, #547e6c 0, transparent 38%), linear-gradient(145deg, #202b27, #0e1512); box-shadow: 0 18px 34px rgba(11,20,16,.28); }
+.wallet-card::after { content: ''; position: absolute; width: 150px; height: 150px; right: -65px; bottom: -85px; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; box-shadow: 0 0 0 18px rgba(255,255,255,.035), 0 0 0 36px rgba(255,255,255,.025); }
+.wallet-brand { display: flex; justify-content: space-between; align-items: center; font-size: .72rem; letter-spacing: .12em; color: #bdd2c8; }
+.wallet-chip { width: 32px; height: 24px; margin-top: 20px; border-radius: 6px; background: linear-gradient(135deg,#e7cf85,#9f7930); }
+.wallet-balance { margin-top: 18px; font-size: 1.65rem; font-weight: 850; }
+.wallet-owner { margin-top: 3px; color: #bdd2c8; font-size: .8rem; }
+.payment-to { margin: 14px 2px 7px; display: flex; justify-content: space-between; color: var(--muted); font-size: .85rem; }
+.payment-to strong { color: var(--ink); }
+.payment-amount { margin: 0 0 12px; border: 0; background: transparent; font-size: 2.25rem; }
+.slide-pay { --slide: 0%; position: relative; height: 62px; overflow: hidden; border-radius: 18px; background: #dfe5e1; }
+.slide-pay::before { content: ''; position: absolute; inset: 0; width: var(--slide); background: linear-gradient(90deg,#2d7555,#194f3b); }
+.slide-pay span { position: absolute; inset: 0; display: grid; place-items: center; padding-left: 52px; font-weight: 750; color: #57625c; pointer-events: none; }
+.slide-pay input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: grab; }
+.slide-knob { position: absolute; z-index: 1; left: 6px; top: 6px; width: 50px; height: 50px; display: grid; place-items: center; border-radius: 15px; background: white; color: var(--green); font-size: 1.4rem; box-shadow: 0 3px 12px rgba(0,0,0,.18); pointer-events: none; transition: left .08s linear; }
+.payment-cancel { margin: 10px 0 0; color: var(--muted); background: transparent; box-shadow: none; }
 
 .property-item {
     margin-bottom: 8px;
@@ -1200,13 +1219,27 @@ function openPaymentPicker() {
     showCard('Кому заплатити?', `<div class="remote-list">${targets.map(player => `<button onclick="openPaymentAmount('${player.id}','${escapeHtml(player.name)}')">${escapeHtml(player.name)} · ${player.money} ₴</button>`).join('')}${onlineRole !== 'banker' ? '<button class="warning" onclick="openPaymentAmount(\'bank\',\'Банк\')">Банку</button>' : ''}</div>`);
 }
 function openPaymentAmount(targetId, targetName) {
-    showCard(`Платіж: ${targetName}`, `<input id="paymentAmount" class="payment-amount" type="number" min="1" inputmode="numeric" placeholder="0"><button class="success" onclick="confirmPayment('${targetId}')">Переказати</button>`);
+    const state = onlineRole === 'banker' ? roomSnapshot() : remoteState;
+    const me = state.players.find(player => player.id === myPlayerId);
+    showCard('Підтвердження платежу', `<div class="wallet-card"><div class="wallet-brand"><span>MONOPOLIA BANK</span><span>•••</span></div><div class="wallet-chip"></div><div class="wallet-balance">${me?.money ?? 0} ₴</div><div class="wallet-owner">${escapeHtml(me?.name || '')}</div></div><div class="payment-to"><span>Одержувач</span><strong>${targetName}</strong></div><input id="paymentAmount" class="payment-amount" type="number" min="1" inputmode="numeric" placeholder="0 ₴"><div id="slidePay" class="slide-pay"><span>Проведіть для оплати</span><div id="slideKnob" class="slide-knob">→</div><input id="paymentSlider" aria-label="Проведіть для оплати" type="range" min="0" max="100" value="0" oninput="updatePaymentSlider(this)" onchange="finishPaymentSlide(this,'${targetId}')"></div><button class="payment-cancel" onclick="closeCard()">Скасувати</button>`);
+    document.getElementById('card').classList.add('payment-mode');
     setTimeout(() => document.getElementById('paymentAmount')?.focus(), 50);
+}
+function updatePaymentSlider(slider) {
+    const track = document.getElementById('slidePay');
+    const knob = document.getElementById('slideKnob');
+    track.style.setProperty('--slide', `${slider.value}%`);
+    knob.style.left = `${6 + (track.clientWidth - 62) * Number(slider.value) / 100}px`;
+}
+function finishPaymentSlide(slider, targetId) {
+    if (Number(slider.value) >= 92) confirmPayment(targetId);
+    else { slider.value = 0; updatePaymentSlider(slider); }
 }
 function confirmPayment(targetId) {
     const amount = Number(document.getElementById('paymentAmount')?.value);
     if (!Number.isInteger(amount) || amount <= 0) return alert('Введи правильну суму');
     if (onlineRole === 'banker') processTransfer(myPlayerId, targetId, amount); else hostConnection.send({type:'transfer', targetId, amount});
+    if (navigator.vibrate) navigator.vibrate([35, 35, 80]);
     closeCard();
 }
 function processTransfer(fromId, targetId, amount, replyConnection) {
@@ -2317,6 +2350,7 @@ function showCard(title, content) {
 // Закрити картку
 function closeCard() {
     document.getElementById("card").classList.add("hidden");
+    document.getElementById("card").classList.remove("payment-mode");
     document.getElementById("overlay").classList.add("hidden");
 }
 
