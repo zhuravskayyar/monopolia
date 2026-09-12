@@ -664,13 +664,192 @@ select:focus, input:focus {
         display: none;
     }
 }
+
+/* v2 — компактний мобільний інтерфейс для гри за столом */
+:root {
+    --ink: #17201c;
+    --muted: #66716b;
+    --paper: #f7f4ed;
+    --panel: #fffdf8;
+    --line: #ded8cc;
+    --green: #194f3b;
+    --green-2: #2f7657;
+    --gold: #d6a84b;
+    --danger: #9d3f3f;
+}
+
+body {
+    background: #18392f;
+    background-image: radial-gradient(circle at 15% 0%, #2b5b49 0, transparent 34%), linear-gradient(160deg, #153229 0%, #0d211b 100%);
+    color: var(--ink);
+    padding: 0 12px 96px;
+}
+
+.header { max-width: 980px; margin: 0 auto; }
+h1 {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    text-align: left;
+    padding: 22px 4px 8px;
+    margin: 0;
+    font-size: clamp(1.35rem, 5vw, 2rem);
+    letter-spacing: -.03em;
+}
+h1 small { display: block; margin-top: 4px; font-size: .48em; font-weight: 500; color: #c6d6cf; letter-spacing: 0; }
+
+.tab-buttons {
+    max-width: 980px;
+    margin: 8px auto 14px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 4px 0 7px;
+}
+.tab-buttons::-webkit-scrollbar { display: none; }
+.tab-button {
+    min-width: max-content;
+    flex: 0 0 auto;
+    padding: 10px 14px;
+    margin: 0;
+    border-radius: 999px;
+    background: rgba(255,255,255,.09);
+    border-color: rgba(255,255,255,.13);
+    box-shadow: none;
+}
+.tab-button.active { color: var(--green); background: var(--paper); box-shadow: 0 5px 18px rgba(0,0,0,.18); }
+.tab-button .box-header-icon { font-size: 1em; }
+
+.container { max-width: 980px; gap: 14px; align-items: flex-start; }
+.box {
+    background: var(--paper);
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 22px;
+    padding: 14px;
+    min-width: 0;
+    max-width: 620px;
+    box-shadow: 0 16px 40px rgba(0,0,0,.22);
+}
+.box-header { justify-content: space-between; margin: 0 2px 12px; padding: 3px 2px 11px; border-width: 1px; }
+.box-header h2 { margin: 0; font-size: 1.15rem; }
+.box-header .box-header-icon { display: none; }
+
+.property-tools { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 12px; }
+.property-tools input, .property-tools select { margin: 0; min-height: 44px; border: 1px solid var(--line); background: var(--panel); }
+.filter-row { display: flex; gap: 6px; overflow-x: auto; grid-column: 1 / -1; padding-bottom: 2px; }
+.filter-chip { width: auto; min-width: max-content; margin: 0; padding: 8px 12px; border-radius: 999px; background: #e8e5dc; color: #4a544f; box-shadow: none; }
+.filter-chip.active { background: var(--green); color: white; }
+
+.group-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.group-tile {
+    --group-color: #777;
+    width: 100%;
+    height: 104px;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-rows: 13px 1fr;
+    overflow: hidden;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    text-align: left;
+}
+.group-tile::before { content: ''; background: var(--group-color); }
+.group-tile-body { padding: 9px 10px 8px; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+.group-tile strong { font-size: .92rem; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.group-progress { display: flex; gap: 4px; }
+.group-progress i { height: 7px; flex: 1; border-radius: 99px; background: #ddd8ce; }
+.group-progress i.owned { background: var(--group-color); }
+.group-tile small { color: var(--muted); font-size: .7rem; }
+.group-tile.complete { outline: 2px solid var(--gold); outline-offset: -2px; }
+.group-streets { display: grid; gap: 8px; text-align: left; }
+.group-street { border: 1px solid var(--line); border-left: 7px solid var(--street-color); background: var(--panel); border-radius: 12px; padding: 9px; }
+.group-street-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.group-street-top strong { font-size: .95rem; }
+.group-street-top b { color: var(--green); white-space: nowrap; }
+.group-street .property-meta { margin: 5px 0 7px; }
+.group-street select { margin: 0; min-height: 38px; padding: 8px 10px; }
+.group-street-actions { display: grid; grid-template-columns: 40px 1fr 40px; gap: 6px; margin-top: 6px; align-items: center; }
+.group-street-actions button { margin: 0; padding: 8px; height: 38px; }
+.group-street-actions span { text-align: center; font-weight: 700; font-size: .78rem; }
+
+.property-item {
+    margin-bottom: 8px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-left: 7px solid;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(25,39,32,.07);
+    overflow: hidden;
+    background: var(--panel);
+}
+.property-item:hover { transform: none; box-shadow: 0 3px 12px rgba(25,39,32,.1); }
+.property-item::before { display: none; }
+.property-summary { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 12px; cursor: pointer; }
+.property-title { min-width: 0; }
+.property-name { margin: 0 0 5px; font-size: 1rem; line-height: 1.2; justify-content: flex-start; gap: 6px; }
+.property-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--muted); font-size: .8rem; }
+.property-rent { min-width: 70px; text-align: right; }
+.property-rent strong { display: block; color: var(--green); font-size: 1.1rem; }
+.property-rent span { color: var(--muted); font-size: .7rem; text-transform: uppercase; }
+.owner-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+.property-details { display: none; padding: 0 12px 12px; border-top: 1px solid #ece7dc; }
+.property-item.open .property-details { display: block; }
+.property-item.mortgaged { opacity: .67; filter: saturate(.55); }
+.property-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+.property-actions button, .property-actions select { margin: 0; min-height: 42px; }
+.property-actions .wide { grid-column: 1 / -1; }
+.quick-houses { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.quick-houses button { width: 42px; height: 42px; padding: 0; margin: 0; border-radius: 12px; }
+.quick-houses .house-state { flex: 1; text-align: center; font-weight: 700; }
+.monopoly-badge, .mortgage-badge { animation: none; margin: 0; font-size: .65rem; padding: 3px 7px; }
+
+button { background: var(--green); box-shadow: none; border-radius: 11px; }
+button:hover { transform: none; box-shadow: none; }
+button.secondary { background: #69537c; box-shadow: none; }
+button.success { background: var(--green-2); box-shadow: none; }
+button.warning { background: #a46c27; box-shadow: none; }
+button.danger { background: var(--danger); box-shadow: none; }
+button:disabled { opacity: .38; cursor: not-allowed; }
+.total-value { color: var(--muted); }
+.stat-card { background: var(--panel); box-shadow: none; border: 1px solid var(--line); padding: 12px; }
+.stat-value { color: var(--green); }
+
+.mobile-menu { background: rgba(20,39,32,.96); backdrop-filter: blur(14px); border-radius: 18px 18px 0 0; padding: 10px max(10px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.mobile-menu-grid { grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.mobile-menu button { background: transparent; padding: 7px 3px; font-size: .7rem; flex-direction: column; gap: 3px; }
+.mobile-menu button span { font-size: 1.35rem; }
+.mobile-menu button.active { background: rgba(255,255,255,.12); }
+.mobile-menu .desktop-action { display: none; }
+
+.card { background: var(--paper); border-radius: 22px; padding: 20px; }
+.overlay { backdrop-filter: blur(4px); }
+
+@media (max-width: 768px) {
+    body { padding-left: 8px; padding-right: 8px; min-height: 100dvh; }
+    .box { padding: 10px; border-radius: 18px; }
+    .tab-buttons { display: none; }
+    .property-info, .rent-info, .controls, .house-controls { margin: 8px 0; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat-value { font-size: 1.35rem; }
+    #streets-box { height: calc(100dvh - 156px); display: flex; flex-direction: column; }
+    #streets-box .box-header { flex: 0 0 auto; }
+    #streets { flex: 1; display: flex; align-items: stretch; }
+    .group-board { width: 100%; grid-template-rows: repeat(4, minmax(0, 1fr)); }
+    .group-tile { height: auto; min-height: 0; }
+    #streetStats { display: none; }
+}
 </style>
 </head>
 
 <body>
 
 <div class="header">
-    <h1>🏢 Монополія — Облік власності 🏠🚂⚡💧</h1>
+    <h1>Монополія <small>Швидкий облік власності під час гри</small></h1>
 </div>
 
 <div class="auto-save-indicator" id="autoSaveIndicator">
@@ -802,23 +981,20 @@ select:focus, input:focus {
 
 <div class="mobile-menu">
     <div class="mobile-menu-grid">
-        <button onclick="openChance()" class="small warning">
-            🎲 Шанс
+        <button onclick="switchTab('streets')" class="active" data-tab="streets">
+            <span>🏘️</span> Вулиці
         </button>
-        <button onclick="openCommunity()" class="small success">
-            📦 Казна
+        <button onclick="switchTab('railroads')" data-tab="railroads">
+            <span>🚂</span> Вокзали
         </button>
-        <button onclick="drawTransportCard()" class="small secondary">
-            🚗 Транспорт
+        <button onclick="switchTab('utilities')" data-tab="utilities">
+            <span>⚡</span> Сервіси
         </button>
-        <button onclick="saveGameManually()" class="small success">
-            💾 Зберегти
+        <button onclick="switchTab('players')" data-tab="players">
+            <span>👥</span> Гравці
         </button>
-        <button onclick="rollDice()" class="small">
-            🎲 Кубики
-        </button>
-        <button onclick="resetGame()" class="small danger">
-            🔄 Нова
+        <button onclick="switchTab('actions')" data-tab="actions">
+            <span>•••</span> Ще
         </button>
     </div>
 </div>
@@ -848,11 +1024,15 @@ const STORAGE_KEYS = {
 };
 
 // Версія гри (для оновлень)
-const GAME_VERSION = '1.2';
+const GAME_VERSION = '2.0';
 
 // Дані гри
 let players = [];
 let transportCardsUsed = [];
+let propertySearch = '';
+let ownerFilter = 'all';
+let groupFilter = 'all';
+let undoStack = [];
 
 // Шаблони власності (для ініціалізації)
 const propertyTemplates = [
@@ -940,13 +1120,7 @@ function hasSavedGame() {
     const savedProperties = localStorage.getItem(STORAGE_KEYS.PROPERTIES);
     const savedVersion = localStorage.getItem(STORAGE_KEYS.GAME_VERSION);
     
-    // Перевіряємо версію гри
-    if (savedVersion !== GAME_VERSION) {
-        console.log('Версія гри оновилась, очищаємо старе збереження');
-        clearSavedGame();
-        return false;
-    }
-    
+    // Старі збереження сумісні: версія більше не видаляє прогрес.
     return savedPlayers && savedProperties;
 }
 
@@ -995,6 +1169,7 @@ function startNewGame() {
     properties.forEach(prop => {
         prop.owner = null;
         prop.houses = 0;
+        prop.mortgaged = false;
     });
     
     railroads.forEach(rr => {
@@ -1030,6 +1205,7 @@ function loadGame() {
         const savedProperties = localStorage.getItem(STORAGE_KEYS.PROPERTIES);
         if (savedProperties) {
             properties = JSON.parse(savedProperties);
+            properties.forEach(prop => { prop.mortgaged = Boolean(prop.mortgaged); });
         }
         
         // Завантажуємо вокзали
@@ -1177,6 +1353,9 @@ function switchTab(tabName) {
     if (tabIndex >= 0) {
         document.querySelectorAll('.tab-button')[tabIndex].classList.add('active');
     }
+    document.querySelectorAll('.mobile-menu [data-tab]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
     
     // Показуємо/ховаємо бокси
     const allBoxes = ['streets-box', 'railroads-box', 'utilities-box', 'players-box', 'actions-box'];
@@ -1187,16 +1366,16 @@ function switchTab(tabName) {
     // Показуємо потрібні бокси
     if (tabName === 'streets') {
         document.getElementById('streets-box').style.display = 'block';
-        document.getElementById('actions-box').style.display = 'block';
+        document.getElementById('actions-box').style.display = window.innerWidth > 768 ? 'block' : 'none';
     } else if (tabName === 'railroads') {
         document.getElementById('railroads-box').style.display = 'block';
-        document.getElementById('actions-box').style.display = 'block';
+        document.getElementById('actions-box').style.display = window.innerWidth > 768 ? 'block' : 'none';
     } else if (tabName === 'utilities') {
         document.getElementById('utilities-box').style.display = 'block';
-        document.getElementById('actions-box').style.display = 'block';
+        document.getElementById('actions-box').style.display = window.innerWidth > 768 ? 'block' : 'none';
     } else if (tabName === 'players') {
         document.getElementById('players-box').style.display = 'block';
-        document.getElementById('actions-box').style.display = 'block';
+        document.getElementById('actions-box').style.display = window.innerWidth > 768 ? 'block' : 'none';
     } else if (tabName === 'actions') {
         document.getElementById('actions-box').style.display = 'block';
     }
@@ -1212,12 +1391,28 @@ function renderPlayers() {
             <div class="player-item">
                 <div class="player-color" style="background-color: ${player.color}"></div>
                 <div class="player-inputs">
-                    <input value="${player.name}" onchange="players[${index}].name=this.value; updateGameAndSave()" placeholder="Ім'я гравця">
+                    <input value="${player.name}" onchange="renamePlayer(${index}, this.value)" placeholder="Ім'я гравця">
                     <input type="number" value="${player.money}" onchange="players[${index}].money=parseInt(this.value); updateGameAndSave()" placeholder="Гроші">
                 </div>
                 <button class="remove-player" onclick="removePlayer(${index})">×</button>
             </div>`;
     });
+}
+
+function renamePlayer(index, newName) {
+    const cleanName = newName.trim();
+    const oldName = players[index].name;
+    if (!cleanName) { renderPlayers(); return alert('Імʼя гравця не може бути порожнім'); }
+    if (players.some((player, playerIndex) => playerIndex !== index && player.name === cleanName)) {
+        renderPlayers();
+        return alert('Гравець із таким імʼям уже є');
+    }
+    [...properties, ...railroads, ...utilities].forEach(item => {
+        if (item.owner === oldName) item.owner = cleanName;
+    });
+    players[index].name = cleanName;
+    if (ownerFilter === oldName) ownerFilter = cleanName;
+    updateGameAndSave();
 }
 
 // Додавання гравця
@@ -1272,229 +1467,85 @@ function removePlayer(index) {
     }
 }
 
-// Відображення вулиць
-function renderStreets() {
-    const div = document.getElementById("streets");
-    div.innerHTML = "";
-    
-    properties.forEach((property, index) => {
-        const isOwned = property.owner ? true : false;
-        const ownerColor = isOwned ? getPlayerColor(property.owner) : '#cccccc';
-        const isMonopoly = checkMonopoly(property.group, property.owner);
-        const currentRent = calculateCurrentRent(property);
-        
-        div.innerHTML += `
-            <div class="property-item" style="--property-color: ${property.color}; border-left-color: ${property.color}">
-                <div class="property-name">
-                    <span>
-                        <span class="property-icon">🏘️</span>
-                        ${property.name}
-                        ${isMonopoly ? '<span class="monopoly-badge">⭐ Монополія</span>' : ''}
-                    </span>
-                </div>
-                
-                <div class="owner-badge" style="background-color: ${ownerColor}20; color: ${ownerColor}; border: 1px solid ${ownerColor}">
-                    ${property.owner ? "👑 " + property.owner : "🆓 Вільна"}
-                </div>
-                
-                <div class="property-info">
-                    <div class="property-info-item">
-                        <div>Вартість</div>
-                        <div class="property-info-value">${property.price} ₴</div>
-                    </div>
-                    <div class="property-info-item">
-                        <div>Будинок</div>
-                        <div class="property-info-value">${property.houseCost} ₴</div>
-                    </div>
-                    <div class="property-info-item">
-                        <div>Будинки</div>
-                        <div class="property-info-value">${property.houses === 5 ? '🏨 Готель' : property.houses}</div>
-                    </div>
-                </div>
-                
-                <div class="rent-info">
-                    <div>Поточна оренда:</div>
-                    <div class="rent-amount">${currentRent} ₴</div>
-                </div>
-                
-                ${isOwned && isMonopoly ? `
-                    <div class="house-controls">
-                        <div class="house-count">
-                            <span>🏠</span> Будинки: ${property.houses === 5 ? '🏨' : property.houses}
-                        </div>
-                        <div class="house-buttons">
-                            <button onclick="addHouse(${index})" class="small success" ${property.houses >= 5 ? 'disabled' : ''}>
-                                ➕ Додати
-                            </button>
-                            <button onclick="removeHouse(${index})" class="small warning" ${property.houses <= 0 ? 'disabled' : ''}>
-                                ➖ Зняти
-                            </button>
-                            <button onclick="addHotel(${index})" class="small" ${property.houses !== 4 ? 'disabled' : ''}>
-                                🏨 Готель
-                            </button>
-                        </div>
-                    </div>
-                ` : ''}
-                
-                <div class="controls">
-                    <div class="controls-column">
-                        <select onchange="assignProperty(${index}, this.value, 'street')" ${players.length === 0 ? 'disabled' : ''}>
-                            <option value="">— обрати власника —</option>
-                            ${players.map(player => `<option ${property.owner === player.name ? 'selected' : ''}>${player.name}</option>`).join("")}
-                        </select>
-                    </div>
-                    <div class="controls-column">
-                        <button onclick="showPropertyCard(${index})" class="small">
-                            📋 Картка
-                        </button>
-                        ${property.owner ? `
-                            <button onclick="freeProperty(${index}, 'street')" class="small danger">
-                                🗑️ Звільнити
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
-            </div>`;
-    });
+const GROUP_NAMES = {brown:'Коричневі', lightblue:'Блакитні', pink:'Рожеві', orange:'Помаранчеві', red:'Червоні', yellow:'Жовті', green:'Зелені', blue:'Сині'};
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
 }
+
+function setPropertySearch(value) { propertySearch = value.trim().toLowerCase(); renderStreets(); }
+function setOwnerFilter(value) { ownerFilter = value; renderStreets(); }
+function setGroupFilter(value) { groupFilter = value; renderStreets(); }
+function toggleProperty(index) { document.getElementById(`street-${index}`)?.classList.toggle('open'); }
+
+// Вісім кольорових груп повністю поміщаються на одному мобільному екрані.
+function renderStreets() {
+    const div = document.getElementById('streets');
+    div.innerHTML = `<div class="group-board">${Object.entries(GROUP_NAMES).map(([groupKey, groupName]) => {
+        const streets = properties.filter(item => item.group === groupKey);
+        const owned = streets.filter(item => item.owner).length;
+        const commonOwner = streets[0]?.owner && streets.every(item => item.owner === streets[0].owner) ? streets[0].owner : null;
+        const color = streets[0]?.color || '#777';
+        return `<button class="group-tile ${commonOwner ? 'complete' : ''}" style="--group-color:${color}" onclick="showStreetGroup('${groupKey}')">
+            <span class="group-tile-body"><strong>${groupName}</strong><span class="group-progress">${streets.map(item => `<i class="${item.owner ? 'owned' : ''}"></i>`).join('')}</span><small>${commonOwner ? `Монополія: ${escapeHtml(commonOwner)}` : `${owned} із ${streets.length} зайнято`}</small></span>
+        </button>`;
+    }).join('')}</div>`;
+}
+
+function showStreetGroup(groupKey) {
+    const streets = properties.map((property, index) => ({property, index})).filter(({property}) => property.group === groupKey);
+    const content = `<div class="group-streets">${streets.map(({property, index}) => {
+        const group = streets.map(item => item.property);
+        const monopoly = checkMonopoly(groupKey, property.owner);
+        const minHouses = Math.min(...group.map(item => item.houses));
+        const maxHouses = Math.max(...group.map(item => item.houses));
+        const canBuild = monopoly && !group.some(item => item.mortgaged) && property.houses < 5 && property.houses === minHouses;
+        const canSell = property.houses > 0 && property.houses === maxHouses;
+        return `<div class="group-street ${property.mortgaged ? 'mortgaged' : ''}" style="--street-color:${property.color}">
+            <div class="group-street-top"><strong>${escapeHtml(property.name)} ${property.mortgaged ? '<span class="mortgage-badge">ЗАКЛАДЕНО</span>' : ''}</strong><b>${calculateCurrentRent(property)} ₴</b></div>
+            <div class="property-meta"><span>Ціна ${property.price} ₴</span><span>Будинок ${property.houseCost} ₴</span></div>
+            <select onchange="assignPropertyFromGroup(${index}, this.value, '${groupKey}')"><option value="">Вільна</option>${players.map(player => `<option value="${escapeHtml(player.name)}" ${property.owner === player.name ? 'selected' : ''}>${escapeHtml(player.name)}</option>`).join('')}</select>
+            ${property.owner && monopoly ? `<div class="group-street-actions"><button class="warning" onclick="changeHouseFromGroup(${index},-1,'${groupKey}')" ${canSell ? '' : 'disabled'}>−</button><span>${property.houses === 5 ? 'Готель' : `${property.houses} будинки`}</span><button class="success" onclick="changeHouseFromGroup(${index},1,'${groupKey}')" ${canBuild ? '' : 'disabled'}>+</button></div>` : ''}
+            ${property.owner && !property.houses ? `<button class="warning small" onclick="mortgageFromGroup(${index},'${groupKey}')">${property.mortgaged ? 'Викупити' : 'Закласти'}</button>` : ''}
+        </div>`;
+    }).join('')}</div>`;
+    showCard(GROUP_NAMES[groupKey], content);
+}
+
+function refreshStreetGroup(groupKey) { updateGameAndSave(); showStreetGroup(groupKey); }
+function assignPropertyFromGroup(index, owner, groupKey) { assignProperty(index, owner, 'street'); showStreetGroup(groupKey); }
+function changeHouseFromGroup(index, direction, groupKey) { direction > 0 ? (properties[index].houses === 4 ? addHotel(index) : addHouse(index)) : removeHouse(index); showStreetGroup(groupKey); }
+function mortgageFromGroup(index, groupKey) { toggleMortgage(index, 'street'); showStreetGroup(groupKey); }
 
 // Відображення вокзалів
 function renderRailroads() {
     const div = document.getElementById("railroads");
-    div.innerHTML = "";
-    
-    railroads.forEach((railroad, index) => {
-        const isOwned = railroad.owner ? true : false;
-        const ownerColor = isOwned ? getPlayerColor(railroad.owner) : '#cccccc';
-        const rent = calculateRailroadRent(railroad.owner);
-        
-        div.innerHTML += `
-            <div class="property-item" style="--property-color: ${railroad.color}; border-left-color: ${railroad.color}">
-                <div class="property-name">
-                    <span>
-                        <span class="property-icon">${railroad.icon}</span>
-                        ${railroad.name}
-                    </span>
-                    ${railroad.mortgaged ? '<span class="mortgage-badge">📉 Закладено</span>' : ''}
-                </div>
-                
-                <div class="owner-badge" style="background-color: ${ownerColor}20; color: ${ownerColor}; border: 1px solid ${ownerColor}">
-                    ${railroad.owner ? "👑 " + railroad.owner : "🆓 Вільний"}
-                </div>
-                
-                <div class="property-info">
-                    <div class="property-info-item">
-                        <div>Вартість</div>
-                        <div class="property-info-value">${railroad.price} ₴</div>
-                    </div>
-                    <div class="property-info-item">
-                        <div>Залог</div>
-                        <div class="property-info-value">${railroad.mortgage} ₴</div>
-                    </div>
-                    <div class="property-info-item">
-                        <div>Викуп</div>
-                        <div class="property-info-value">${Math.round(railroad.mortgage * 1.1)} ₴</div>
-                    </div>
-                </div>
-                
-                <div class="rent-info">
-                    <div>Поточна оренда:</div>
-                    <div class="rent-amount">${rent} ₴</div>
-                    <small>${railroad.owner ? `Власник має ${countRailroadsByOwner(railroad.owner)} вокзалів` : ''}</small>
-                </div>
-                
-                <div class="controls">
-                    <div class="controls-column">
-                        <select onchange="assignProperty(${index}, this.value, 'railroad')" ${players.length === 0 ? 'disabled' : ''}>
-                            <option value="">— обрати власника —</option>
-                            ${players.map(player => `<option ${railroad.owner === player.name ? 'selected' : ''}>${player.name}</option>`).join("")}
-                        </select>
-                    </div>
-                    <div class="controls-column">
-                        <button onclick="showRailroadCard(${index})" class="small">
-                            📋 Картка
-                        </button>
-                        ${railroad.owner ? `
-                            <button onclick="toggleMortgage(${index}, 'railroad')" class="small warning">
-                                ${railroad.mortgaged ? '📈 Викупити' : '📉 Закласти'}
-                            </button>
-                            <button onclick="freeProperty(${index}, 'railroad')" class="small danger">
-                                🗑️ Звільнити
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
-            </div>`;
-    });
+    div.innerHTML = renderSpecialProperties(railroads, 'railroad');
 }
 
 // Відображення комунікацій
 function renderUtilities() {
     const div = document.getElementById("utilities");
-    div.innerHTML = "";
-    
-    utilities.forEach((utility, index) => {
-        const isOwned = utility.owner ? true : false;
-        const ownerColor = isOwned ? getPlayerColor(utility.owner) : '#cccccc';
-        
-        div.innerHTML += `
-            <div class="property-item" style="--property-color: ${utility.color}; border-left-color: ${utility.color}">
-                <div class="property-name">
-                    <span>
-                        <span class="property-icon">${utility.icon}</span>
-                        ${utility.name}
-                    </span>
-                    ${utility.mortgaged ? '<span class="mortgage-badge">📉 Закладено</span>' : ''}
-                </div>
-                
-                <div class="owner-badge" style="background-color: ${ownerColor}20; color: ${ownerColor}; border: 1px solid ${ownerColor}">
-                    ${utility.owner ? "👑 " + utility.owner : "🆓 Вільна"}
-                </div>
-                
-                <div class="property-info">
-                    <div class="property-info-item">
-                        <div>Вартість</div>
-                        <div class="property-info-value">${utility.price} ₴</div>
-                    </div>
-                    <div class="property-info-item">
-                        <div>Залог</div>
-                        <div class="property-info-value">${utility.mortgage} ₴</div>
-                    </div>
-                    <div class="property-info-item">
-                        <div>Викуп</div>
-                        <div class="property-info-value">${Math.round(utility.mortgage * 1.1)} ₴</div>
-                    </div>
-                </div>
-                
-                <div class="rent-info">
-                    <div>Оренда залежить від кількості комунікацій:</div>
-                    <div class="rent-amount">1 комунікація: (сума кубиків) × 4</div>
-                    <div class="rent-amount">2 комунікації: (сума кубиків) × 10</div>
-                </div>
-                
-                <div class="controls">
-                    <div class="controls-column">
-                        <select onchange="assignProperty(${index}, this.value, 'utility')" ${players.length === 0 ? 'disabled' : ''}>
-                            <option value="">— обрати власника —</option>
-                            ${players.map(player => `<option ${utility.owner === player.name ? 'selected' : ''}>${player.name}</option>`).join("")}
-                        </select>
-                    </div>
-                    <div class="controls-column">
-                        <button onclick="showUtilityCard(${index})" class="small">
-                            📋 Картка
-                        </button>
-                        ${utility.owner ? `
-                            <button onclick="toggleMortgage(${index}, 'utility')" class="small warning">
-                                ${utility.mortgaged ? '📈 Викупити' : '📉 Закласти'}
-                            </button>
-                            <button onclick="freeProperty(${index}, 'utility')" class="small danger">
-                                🗑️ Звільнити
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
-            </div>`;
-    });
+    div.innerHTML = renderSpecialProperties(utilities, 'utility');
+}
+
+function renderSpecialProperties(collection, type) {
+    return collection.map((item, index) => {
+        const ownerColor = item.owner ? getPlayerColor(item.owner) : '#9aa29e';
+        const rent = type === 'railroad' && !item.mortgaged ? calculateRailroadRent(item.owner) : 0;
+        const cardAction = type === 'railroad' ? `showRailroadCard(${index})` : `showUtilityCard(${index})`;
+        const count = type === 'railroad' ? countRailroadsByOwner(item.owner) : countUtilitiesByOwner(item.owner);
+        const rentText = type === 'railroad' ? `${rent} ₴` : (item.owner && !item.mortgaged ? (count === 2 ? '×10' : '×4') : '—');
+        return `<article class="property-item ${item.mortgaged ? 'mortgaged' : ''}" style="border-left-color:${item.color}">
+            <div class="property-summary" onclick="this.parentElement.classList.toggle('open')">
+                <div class="property-title"><div class="property-name">${item.icon} ${escapeHtml(item.name)} ${item.mortgaged ? '<span class="mortgage-badge">ЗАКЛАДЕНО</span>' : ''}</div>
+                <div class="property-meta"><span><i class="owner-dot" style="background:${ownerColor}"></i>${item.owner ? escapeHtml(item.owner) : 'Вільна'}</span><span>Ціна ${item.price} ₴</span></div></div>
+                <div class="property-rent"><span>оренда</span><strong>${rentText}</strong></div>
+            </div>
+            <div class="property-details"><div class="property-meta"><span>Застава: ${item.mortgage} ₴</span><span>Викуп: ${Math.round(item.mortgage * 1.1)} ₴</span>${item.owner ? `<span>У власника: ${count}</span>` : ''}</div>
+            <div class="property-actions"><select class="wide" onchange="assignProperty(${index}, this.value, '${type}')"><option value="">— обрати власника —</option>${players.map(player => `<option value="${escapeHtml(player.name)}" ${item.owner === player.name ? 'selected' : ''}>${escapeHtml(player.name)}</option>`).join('')}</select><button onclick="${cardAction}">Картка</button>${item.owner ? `<button class="warning" onclick="toggleMortgage(${index}, '${type}')">${item.mortgaged ? 'Викупити' : 'Закласти'}</button><button class="danger wide" onclick="freeProperty(${index}, '${type}')">Звільнити</button>` : ''}</div></div>
+        </article>`;
+    }).join('');
 }
 
 // Привласнити власність гравцю
@@ -1512,6 +1563,7 @@ function assignProperty(index, ownerName, type) {
     
     item = collection[index];
     
+    const previousOwner = item.owner;
     if (ownerName === "") {
         item.owner = null;
         if (type === 'street') {
@@ -1521,8 +1573,9 @@ function assignProperty(index, ownerName, type) {
         }
     } else {
         item.owner = ownerName;
-        if (type !== 'street') {
+        if (previousOwner && previousOwner !== ownerName) {
             item.mortgaged = false;
+            if (type === 'street') item.houses = 0;
         }
     }
     
@@ -1534,6 +1587,7 @@ function freeProperty(index, type) {
     if (type === 'street') {
         properties[index].owner = null;
         properties[index].houses = 0;
+        properties[index].mortgaged = false;
     } else if (type === 'railroad') {
         railroads[index].owner = null;
         railroads[index].mortgaged = false;
@@ -1547,38 +1601,47 @@ function freeProperty(index, type) {
 // Додати будинок
 function addHouse(index) {
     const property = properties[index];
-    
-    if (property.houses < 4 && checkMonopoly(property.group, property.owner)) {
+    const group = properties.filter(item => item.group === property.group);
+    const minHouses = Math.min(...group.map(item => item.houses));
+    if (property.mortgaged) return alert('Спочатку викупіть вулицю');
+    if (group.some(item => item.mortgaged)) return alert('Не можна будувати, поки одна з вулиць групи закладена');
+    if (property.houses < 4 && property.houses === minHouses && checkMonopoly(property.group, property.owner)) {
         property.houses++;
         updateGameAndSave();
-    }
+    } else alert('Будинки треба розподіляти рівномірно по всій кольоровій групі');
 }
 
 // Видалити будинок
 function removeHouse(index) {
     const property = properties[index];
-    
-    if (property.houses > 0) {
+    const group = properties.filter(item => item.group === property.group);
+    const maxHouses = Math.max(...group.map(item => item.houses));
+    if (property.houses > 0 && property.houses === maxHouses) {
         property.houses--;
         updateGameAndSave();
-    }
+    } else alert('Будинки треба продавати рівномірно по всій кольоровій групі');
 }
 
 // Додати готель
 function addHotel(index) {
     const property = properties[index];
-    
-    if (property.houses === 4 && checkMonopoly(property.group, property.owner)) {
+    const group = properties.filter(item => item.group === property.group);
+    if (property.houses === 4 && group.every(item => item.houses >= 4 && !item.mortgaged) && checkMonopoly(property.group, property.owner)) {
         property.houses = 5;
         updateGameAndSave();
-    }
+    } else alert('Для готелю на кожній вулиці групи має бути по 4 будинки');
 }
 
 // Змінити статус залогу
 function toggleMortgage(index, type) {
     let item;
     
-    if (type === 'railroad') {
+    if (type === 'street') {
+        item = properties[index];
+        if (!item.mortgaged && item.houses > 0) return alert('Спочатку продайте всі будинки');
+        const group = properties.filter(property => property.group === item.group);
+        if (!item.mortgaged && group.some(property => property.houses > 0)) return alert('Спочатку продайте будинки з усієї кольорової групи');
+    } else if (type === 'railroad') {
         item = railroads[index];
     } else {
         item = utilities[index];
@@ -1640,7 +1703,7 @@ function calculateUtilityRent(ownerName, diceSum) {
 
 // Розрахувати поточну оренду для вулиці
 function calculateCurrentRent(property) {
-    if (!property.owner) return 0;
+    if (!property.owner || property.mortgaged) return 0;
     
     const isMonopoly = checkMonopoly(property.group, property.owner);
     
