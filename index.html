@@ -1110,7 +1110,9 @@ const STORAGE_KEYS = {
 };
 
 // Версія гри (для оновлень)
-const GAME_VERSION = '2.0';
+const GAME_VERSION = '2.1';
+const BANK_HOUSE_LIMIT = 32;
+const BANK_HOTEL_LIMIT = 12;
 
 // Дані гри
 let players = [];
@@ -1553,7 +1555,7 @@ function loadGame() {
         const savedProperties = localStorage.getItem(STORAGE_KEYS.PROPERTIES);
         if (savedProperties) {
             properties = JSON.parse(savedProperties);
-            properties.forEach(prop => { prop.mortgaged = Boolean(prop.mortgaged); });
+            properties.forEach(prop => { prop.mortgaged = Boolean(prop.mortgaged); prop.houses = Number.isInteger(prop.houses) ? Math.max(0, Math.min(5, prop.houses)) : 0; });
         }
         
         // Завантажуємо вокзали
@@ -1843,21 +1845,22 @@ function renderStreets() {
 
 function showStreetGroup(groupKey) {
     const streets = properties.map((property, index) => ({property, index})).filter(({property}) => property.group === groupKey);
-    const content = `<div class="group-streets">${streets.map(({property, index}) => {
+    const stock = buildingStock();
+    const content = `<div style="text-align:center;margin-bottom:14px;font-weight:750">Банк: 🏠 ${stock.houses}/${BANK_HOUSE_LIMIT} · 🏨 ${stock.hotels}/${BANK_HOTEL_LIMIT}</div><div class="group-streets">${streets.map(({property, index}) => {
         const group = streets.map(item => item.property);
         const monopoly = checkMonopoly(groupKey, property.owner);
         const minHouses = Math.min(...group.map(item => item.houses));
         const maxHouses = Math.max(...group.map(item => item.houses));
-        const canBuild = monopoly && !group.some(item => item.mortgaged) && property.houses < 5 && property.houses === minHouses;
-        const canSell = property.houses > 0 && property.houses === maxHouses;
+        const canBuild = canDevelop(property) && (property.houses === 4 ? buildingStock().hotels > 0 : buildingStock().houses > 0) && (playerForOwner(property.owner)?.money ?? -1) >= property.houseCost;
+        const canSell = property.houses > 0 && property.houses === maxHouses && (property.houses !== 5 || buildingStock().houses >= 4);
         return `<div class="group-street ${property.mortgaged ? 'mortgaged' : ''}" style="--street-color:${property.color}">
             <div class="group-street-top"><strong>${escapeHtml(property.name)} ${property.mortgaged ? '<span class="mortgage-badge">ЗАКЛАДЕНО</span>' : ''}</strong><b>${calculateCurrentRent(property)} ₴</b></div>
             <div class="property-meta"><span>Ціна ${property.price} ₴</span><span>Будинок ${property.houseCost} ₴</span></div>
-            <select onchange="assignPropertyFromGroup(${index}, this.value, '${groupKey}')"><option value="">Вільна</option>${players.map(player => `<option value="${escapeHtml(player.name)}" ${property.owner === player.name ? 'selected' : ''}>${escapeHtml(player.name)}</option>`).join('')}</select>
+            <select ${property.owner && groupHasBuildings(groupKey) ? 'disabled title="Спочатку продайте забудову групи"' : ''} onchange="assignPropertyFromGroup(${index}, this.value, '${groupKey}')"><option value="">Вільна</option>${players.map(player => `<option value="${escapeHtml(player.name)}" ${property.owner === player.name ? 'selected' : ''}>${escapeHtml(player.name)}</option>`).join('')}</select>
             ${property.owner && monopoly ? `<div class="group-street-actions"><button class="warning" onclick="changeHouseFromGroup(${index},-1,'${groupKey}')" ${canSell ? '' : 'disabled'}>−</button><span>${property.houses === 5 ? 'Готель' : `${property.houses} будинки`}</span><button class="success" onclick="changeHouseFromGroup(${index},1,'${groupKey}')" ${canBuild ? '' : 'disabled'}>+</button></div>` : ''}
-            ${property.owner && !property.houses ? `<button class="warning small" onclick="mortgageFromGroup(${index},'${groupKey}')">${property.mortgaged ? 'Викупити' : 'Закласти'}</button>` : ''}
+            ${property.owner && !property.houses ? `<button class="warning small" onclick="mortgageFromGroup(${index},'${groupKey}')">${property.mortgaged ? 'Викупити' : 'Закласти'}</button>` : ''}${!property.owner ? `<button class="secondary small" onclick="auctionPropertyFromGroup(${index},'${groupKey}')">Аукціон вулиці</button>` : ''}${canBuild ? `<button class="secondary small" onclick="auctionBuildingFromGroup(${index},'${groupKey}')">Аукціон будівлі</button>` : ''}
         </div>`;
-    }).join('')}</div>`;
+    }).join('')}</div>${groupHasBuildings(groupKey) ? `<button class="warning small" onclick="sellBuildingsFromGroup('${groupKey}')">Продати всю забудову групи (50%)</button>` : ''}`;
     showCard(GROUP_NAMES[groupKey], content);
 }
 
@@ -1865,6 +1868,9 @@ function refreshStreetGroup(groupKey) { updateGameAndSave(); showStreetGroup(gro
 function assignPropertyFromGroup(index, owner, groupKey) { assignProperty(index, owner, 'street'); showStreetGroup(groupKey); }
 function changeHouseFromGroup(index, direction, groupKey) { direction > 0 ? (properties[index].houses === 4 ? addHotel(index) : addHouse(index)) : removeHouse(index); showStreetGroup(groupKey); }
 function mortgageFromGroup(index, groupKey) { toggleMortgage(index, 'street'); showStreetGroup(groupKey); }
+function auctionPropertyFromGroup(index, groupKey) { auctionProperty(index, 'street'); showStreetGroup(groupKey); }
+function auctionBuildingFromGroup(index, groupKey) { auctionBuilding(index); showStreetGroup(groupKey); }
+function sellBuildingsFromGroup(groupKey) { sellBuildingsGroup(groupKey); showStreetGroup(groupKey); }
 
 // Відображення вокзалів
 function renderRailroads() {
@@ -1892,112 +1898,186 @@ function renderSpecialProperties(collection, type) {
                 <div class="property-rent"><span>оренда</span><strong>${rentText}</strong></div>
             </div>
             <div class="property-details"><div class="property-meta"><span>Застава: ${item.mortgage} ₴</span><span>Викуп: ${Math.round(item.mortgage * 1.1)} ₴</span>${item.owner ? `<span>У власника: ${count}</span>` : ''}</div>
-            <div class="property-actions"><select class="wide" onchange="assignProperty(${index}, this.value, '${type}')"><option value="">— обрати власника —</option>${players.map(player => `<option value="${escapeHtml(player.name)}" ${item.owner === player.name ? 'selected' : ''}>${escapeHtml(player.name)}</option>`).join('')}</select><button onclick="${cardAction}">Картка</button>${item.owner ? `<button class="warning" onclick="toggleMortgage(${index}, '${type}')">${item.mortgaged ? 'Викупити' : 'Закласти'}</button><button class="danger wide" onclick="freeProperty(${index}, '${type}')">Звільнити</button>` : ''}</div></div>
+            <div class="property-actions"><select class="wide" onchange="assignProperty(${index}, this.value, '${type}')"><option value="">— обрати власника —</option>${players.map(player => `<option value="${escapeHtml(player.name)}" ${item.owner === player.name ? 'selected' : ''}>${escapeHtml(player.name)}</option>`).join('')}</select><button onclick="${cardAction}">Картка</button>${!item.owner ? `<button class="secondary" onclick="auctionProperty(${index}, '${type}')">Аукціон</button>` : ''}${item.owner ? `<button class="warning" onclick="toggleMortgage(${index}, '${type}')">${item.mortgaged ? 'Викупити' : 'Закласти'}</button><button class="danger wide" onclick="freeProperty(${index}, '${type}')">Звільнити</button>` : ''}</div></div>
         </article>`;
     }).join('');
 }
 
-// Привласнити власність гравцю
-function assignProperty(index, ownerName, type) {
-    let item;
-    let collection;
-    
-    if (type === 'street') {
-        collection = properties;
-    } else if (type === 'railroad') {
-        collection = railroads;
-    } else {
-        collection = utilities;
-    }
-    
-    item = collection[index];
-    
-    const previousOwner = item.owner;
-    if (ownerName === "") {
-        item.owner = null;
-        if (type === 'street') {
-            item.houses = 0;
-        } else {
-            item.mortgaged = false;
-        }
-    } else {
-        item.owner = ownerName;
-        if (previousOwner && previousOwner !== ownerName) {
-            item.mortgaged = false;
-            if (type === 'street') item.houses = 0;
-        }
-    }
-    
-    updateGameAndSave();
+// Будівлі фізично обмежені: готель звільняє чотири будинки банку.
+function buildingStock() {
+    const occupiedHouses = properties.reduce((sum, item) => sum + (item.houses >= 1 && item.houses <= 4 ? item.houses : 0), 0);
+    const occupiedHotels = properties.filter(item => item.houses === 5).length;
+    return {houses: Math.max(0, BANK_HOUSE_LIMIT - occupiedHouses), hotels: Math.max(0, BANK_HOTEL_LIMIT - occupiedHotels)};
 }
-
-// Звільнити власність
-function freeProperty(index, type) {
-    if (type === 'street') {
-        properties[index].owner = null;
-        properties[index].houses = 0;
-        properties[index].mortgaged = false;
-    } else if (type === 'railroad') {
-        railroads[index].owner = null;
-        railroads[index].mortgaged = false;
-    } else {
-        utilities[index].owner = null;
-        utilities[index].mortgaged = false;
-    }
-    updateGameAndSave();
+function propertyCollection(type) {
+    return type === 'street' ? properties : type === 'railroad' ? railroads : type === 'utility' ? utilities : null;
 }
-
-// Додати будинок
-function addHouse(index) {
-    const property = properties[index];
+function mortgageAmount(item) { return Number.isFinite(item.mortgage) ? item.mortgage : Math.round(item.price / 2); }
+function playerForOwner(name) { return players.find(player => player.name === name); }
+function groupHasBuildings(groupKey) { return properties.some(item => item.group === groupKey && item.houses > 0); }
+function canDevelop(property) {
+    if (!property.owner || property.mortgaged || !checkMonopoly(property.group, property.owner)) return false;
     const group = properties.filter(item => item.group === property.group);
-    const minHouses = Math.min(...group.map(item => item.houses));
-    if (property.mortgaged) return alert('Спочатку викупіть вулицю');
-    if (group.some(item => item.mortgaged)) return alert('Не можна будувати, поки одна з вулиць групи закладена');
-    if (property.houses < 4 && property.houses === minHouses && checkMonopoly(property.group, property.owner)) {
-        property.houses++;
-        updateGameAndSave();
-    } else alert('Будинки треба розподіляти рівномірно по всій кольоровій групі');
+    return !group.some(item => item.mortgaged) && property.houses < 5 &&
+        property.houses === Math.min(...group.map(item => item.houses)) &&
+        (property.houses < 4 || group.every(item => item.houses >= 4));
 }
 
-// Видалити будинок
+// Придбання в банку, приватна угода або внесення результату аукціону.
+function assignProperty(index, ownerName, type, priceOverride = null) {
+    const collection = propertyCollection(type);
+    const item = collection && collection[index];
+    if (!item) return false;
+    if (!ownerName) return freeProperty(index, type);
+    if (item.owner === ownerName) return true;
+    const buyer = playerForOwner(ownerName);
+    if (!buyer) return alert('Гравця не знайдено'), false;
+    const previousOwner = item.owner ? playerForOwner(item.owner) : null;
+    if (type === 'street' && item.owner && groupHasBuildings(item.group)) {
+        alert('Спочатку продайте всі будівлі цієї кольорової групи');
+        return false;
+    }
+    let price = priceOverride;
+    if (price === null) {
+        price = previousOwner ? prompt('Вкажіть узгоджену ціну продажу вулиці/обʼєкта (₴)', String(item.price)) : item.price;
+        if (price === null) return false;
+    }
+    price = Number(price);
+    if (!Number.isSafeInteger(price) || price < 0) return alert('Ціна має бути цілим невідʼємним числом'), false;
+    const mortgageFee = previousOwner && item.mortgaged ? Math.ceil(mortgageAmount(item) * 0.1) : 0;
+    if (buyer.money < price + mortgageFee) {
+        alert('Недостатньо коштів: потрібно ' + (price + mortgageFee) + ' ₴');
+        return false;
+    }
+    buyer.money -= price + mortgageFee;
+    if (previousOwner) previousOwner.money += price;
+    item.owner = buyer.name;
+    if (!previousOwner) { item.mortgaged = false; if (type === 'street') item.houses = 0; }
+    updateGameAndSave();
+    showSaveNotification(previousOwner ? 'Угода: ' + price + ' ₴' : 'Купівля: ' + price + ' ₴');
+    return true;
+}
+
+// Аукціон проводять гравці; банкір заносить переможця й кінцеву ставку.
+function auctionProperty(index, type) {
+    const item = propertyCollection(type)?.[index];
+    if (!item || item.owner) return alert('Аукціон можливий лише для вільної власності');
+    if (!players.length) return alert('Спочатку додайте гравців');
+    const name = prompt('Переможець аукціону (точне імʼя): ' + players.map(p => p.name).join(', '), players[0].name);
+    if (name === null) return;
+    if (!playerForOwner(name.trim())) return alert('Такого гравця немає');
+    const entry = prompt('Фінальна ставка переможця (₴)', String(item.price));
+    if (entry === null) return;
+    if (!/^\d+$/.test(entry.trim())) return alert('Ставка має бути цілим невідʼємним числом');
+    assignProperty(index, name.trim(), type, Number(entry));
+}
+
+// Повернення власності до банку — адміністративна дія, без продажної виплати.
+function freeProperty(index, type) {
+    const item = propertyCollection(type)?.[index];
+    if (!item) return false;
+    if (type === 'street' && groupHasBuildings(item.group)) {
+        alert('Не можна передавати власність, поки в кольоровій групі є будинки або готелі');
+        return false;
+    }
+    item.owner = null;
+    item.mortgaged = false;
+    if (type === 'street') item.houses = 0;
+    updateGameAndSave();
+    return true;
+}
+
+function buyBuilding(index, priceOverride = null) {
+    const property = properties[index];
+    if (!property || !property.owner) return alert('Спочатку придбайте вулицю'), false;
+    if (!canDevelop(property)) return alert('Потрібна повна незакладена монополія та рівномірна забудова'), false;
+    const stock = buildingStock();
+    const hotel = property.houses === 4;
+    if (hotel && !stock.hotels) return alert('У банку немає вільних готелів'), false;
+    if (!hotel && !stock.houses) return alert('У банку закінчилися будинки'), false;
+    const cost = priceOverride === null ? property.houseCost : Number(priceOverride);
+    if (!Number.isSafeInteger(cost) || cost < 0) return alert('Некоректна ціна будівлі'), false;
+    const owner = playerForOwner(property.owner);
+    if (!owner || owner.money < cost) return alert('Недостатньо коштів для забудови: ' + cost + ' ₴'), false;
+    owner.money -= cost;
+    property.houses += 1; // П'ятий рівень — готель, чотири будинки повертаються в банк.
+    updateGameAndSave();
+    showSaveNotification((hotel ? 'Готель' : 'Будинок') + ' придбано за ' + cost + ' ₴');
+    return true;
+}
+function addHouse(index) { return buyBuilding(index); }
+function addHotel(index) { return buyBuilding(index); }
+
+// Якщо декілька претендентів на дефіцитний запас — банкір проводить торги.
+function auctionBuilding(index) {
+    const property = properties[index];
+    if (!property || !canDevelop(property)) return alert('Будівництво зараз недоступне');
+    const stock = buildingStock();
+    const hotel = property.houses === 4;
+    if (hotel ? !stock.hotels : !stock.houses) return alert('У банку немає потрібних будівель');
+    const entry = prompt('Після аукціону введіть переможну ставку для ' + property.owner + ' (₴)', String(property.houseCost));
+    if (entry === null) return;
+    if (!/^\d+$/.test(entry.trim())) return alert('Введіть цілу невідʼємну суму');
+    buyBuilding(index, Number(entry));
+}
+
 function removeHouse(index) {
     const property = properties[index];
+    if (!property || !property.owner || property.houses === 0) return false;
     const group = properties.filter(item => item.group === property.group);
-    const maxHouses = Math.max(...group.map(item => item.houses));
-    if (property.houses > 0 && property.houses === maxHouses) {
-        property.houses--;
-        updateGameAndSave();
-    } else alert('Будинки треба продавати рівномірно по всій кольоровій групі');
-}
-
-// Додати готель
-function addHotel(index) {
-    const property = properties[index];
-    const group = properties.filter(item => item.group === property.group);
-    if (property.houses === 4 && group.every(item => item.houses >= 4 && !item.mortgaged) && checkMonopoly(property.group, property.owner)) {
-        property.houses = 5;
-        updateGameAndSave();
-    } else alert('Для готелю на кожній вулиці групи має бути по 4 будинки');
-}
-
-// Змінити статус залогу
-function toggleMortgage(index, type) {
-    let item;
-    
-    if (type === 'street') {
-        item = properties[index];
-        if (!item.mortgaged && item.houses > 0) return alert('Спочатку продайте всі будинки');
-        const group = properties.filter(property => property.group === item.group);
-        if (!item.mortgaged && group.some(property => property.houses > 0)) return alert('Спочатку продайте будинки з усієї кольорової групи');
-    } else if (type === 'railroad') {
-        item = railroads[index];
-    } else {
-        item = utilities[index];
+    const maxLevel = Math.max(...group.map(item => item.houses));
+    if (property.houses !== maxLevel) return alert('Продавати будівлі потрібно рівномірно по всій групі'), false;
+    // Під час продажу готелю в банк мають повернутися чотири фізичні будинки.
+    if (property.houses === 5 && buildingStock().houses < 4) {
+        return alert('У банку бракує чотирьох будинків для заміни готелю. Продайте забудову всієї групи.'), false;
     }
-    
-    item.mortgaged = !item.mortgaged;
+    const seller = playerForOwner(property.owner);
+    if (!seller) return false;
+    seller.money += Math.floor(property.houseCost / 2);
+    property.houses -= 1;
     updateGameAndSave();
+    showSaveNotification('Продаж будівлі: +' + Math.floor(property.houseCost / 2) + ' ₴');
+    return true;
+}
+
+// Повна ліквідація групи: 4 будинки + готель рахуються як 5 рівнів.
+function sellBuildingsGroup(groupKey) {
+    const group = properties.filter(item => item.group === groupKey);
+    const total = group.reduce((sum, item) => sum + (item.houses === 5 ? 5 : item.houses) * item.houseCost / 2, 0);
+    if (!total) return;
+    if (!confirm('Продати ВСІ будинки й готелі групи банку за ' + total + ' ₴?')) return;
+    for (const item of group) {
+        if (item.houses && playerForOwner(item.owner)) {
+            playerForOwner(item.owner).money += (item.houses === 5 ? 5 : item.houses) * item.houseCost / 2;
+        }
+        item.houses = 0;
+    }
+    updateGameAndSave();
+    showSaveNotification('Забудову групи продано за ' + total + ' ₴');
+}
+
+// Застава: виплата половини ціни; викуп: основна сума + 10%.
+function toggleMortgage(index, type) {
+    const item = propertyCollection(type)?.[index];
+    if (!item || !item.owner) return alert('Власність повинна мати власника'), false;
+    const owner = playerForOwner(item.owner);
+    if (!owner) return false;
+    const amount = mortgageAmount(item);
+    if (item.mortgaged) {
+        const cost = Math.ceil(amount * 1.1);
+        if (owner.money < cost) return alert('Для викупу потрібно ' + cost + ' ₴'), false;
+        owner.money -= cost;
+        item.mortgaged = false;
+        updateGameAndSave();
+        showSaveNotification('Викуп застави: −' + cost + ' ₴');
+    } else {
+        if (type === 'street' && groupHasBuildings(item.group)) return alert('Спочатку продайте всі будівлі групи'), false;
+        owner.money += amount;
+        item.mortgaged = true;
+        updateGameAndSave();
+        showSaveNotification('Застава: +' + amount + ' ₴');
+    }
+    return true;
 }
 
 // Перевірити монополію
@@ -2685,12 +2765,12 @@ function updateStats() {
                 <div class="stat-value">${ownedStreets}</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Будинки</div>
-                <div class="stat-value">${totalHouses}</div>
+                <div class="stat-label">Будинки (на полі / в банку)</div>
+                <div class="stat-value">${totalHouses} / ${Math.max(0, BANK_HOUSE_LIMIT - totalHouses)}</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Готелі</div>
-                <div class="stat-value">${totalHotels}</div>
+                <div class="stat-label">Готелі (на полі / в банку)</div>
+                <div class="stat-value">${totalHotels} / ${Math.max(0, BANK_HOTEL_LIMIT - totalHotels)}</div>
             </div>
         </div>
     `;
