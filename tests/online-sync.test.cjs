@@ -153,6 +153,7 @@ async function flush() {
   }
   assert.equal(banker.read('players.length'), 5, 'banker included among five participants');
   assert.deepEqual(banker.read('players.map(p => p.name)'), ['Banker','Alice','Bob','Carol','Dan']);
+  assert.ok(banker.element('roomStatus').innerHTML.includes('Онлайн: 5/5'), 'banker sees 5/5 clients online');
   for (const client of clients) {
     assert.equal(client.read('remoteState.players.length'), 5, client.name + ' sees all 5 players');
     assert.equal(client.read('remoteState.roomCode'), code);
