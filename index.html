@@ -1944,7 +1944,13 @@ function assignProperty(index, ownerName, type, priceOverride = null) {
     }
     price = Number(price);
     if (!Number.isSafeInteger(price) || price < 0) return alert('Ціна має бути цілим невідʼємним числом'), false;
-    const mortgageFee = previousOwner && item.mortgaged ? Math.ceil(mortgageAmount(item) * 0.1) : 0;
+    // Новий власник заставленого майна одразу сплачує 10% відсотків.
+    // Він може або відразу погасити кредит (основна сума + 10%),
+    // або залишити заставу й пізніше погасити її знову з 10% відсотками.
+    const redeemNow = Boolean(previousOwner && item.mortgaged) &&
+        confirm('Майно закладене. Натисніть OK, щоб викупити його одразу (сума застави + 10%), або Скасувати, щоб залишити заставу (зараз лише 10%).');
+    const mortgageFee = previousOwner && item.mortgaged ?
+        Math.ceil(mortgageAmount(item) * 0.1) + (redeemNow ? mortgageAmount(item) : 0) : 0;
     if (buyer.money < price + mortgageFee) {
         alert('Недостатньо коштів: потрібно ' + (price + mortgageFee) + ' ₴');
         return false;
@@ -1952,6 +1958,7 @@ function assignProperty(index, ownerName, type, priceOverride = null) {
     buyer.money -= price + mortgageFee;
     if (previousOwner) previousOwner.money += price;
     item.owner = buyer.name;
+    if (redeemNow) item.mortgaged = false;
     if (!previousOwner) { item.mortgaged = false; if (type === 'street') item.houses = 0; }
     updateGameAndSave();
     showSaveNotification(previousOwner ? 'Угода: ' + price + ' ₴' : 'Купівля: ' + price + ' ₴');
