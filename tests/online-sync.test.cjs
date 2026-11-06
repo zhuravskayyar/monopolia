@@ -79,9 +79,17 @@ class Peer extends Emitter {
     for (const conn of this.connections) conn.close();
   }
 }
-function newClient(name, hub) {
+function newClient(name, hub, href = 'https://zhuravskayyar.github.io/monopolia/') {
   const elements = new Map();
   const local = new Map();
+  const qrs = [];
+  const copiedLinks = [];
+  const shares = [];
+  class QRMock {
+    constructor(element, options) { qrs.push(options); element.textContent = 'QR GENERATED'; }
+  }
+  QRMock.CorrectLevel = {M:0};
+  const pageUrl = new URL(href);
   class Element {
     constructor() {
       this.value = '';
@@ -104,9 +112,11 @@ function newClient(name, hub) {
   };
   const context = {
     document,
-    window: {innerWidth: 425, addEventListener() {}},
+    window: {innerWidth: 425, addEventListener() {}, location: pageUrl, QRCode: QRMock},
+    URL,
+    URLSearchParams,
     Peer: class extends Peer { constructor(id) { super(hub, id); } },
-    navigator: {onLine:true, vibrate() {}},
+    navigator: {onLine:true, vibrate() {}, clipboard:{async writeText(url) { copiedLinks.push(url); }}, async share(data) {shares.push(data);} },
     localStorage: {
       getItem(key) { return local.get(key) ?? null; },
       setItem(key, value) { local.set(key, String(value)); },
@@ -130,6 +140,9 @@ function newClient(name, hub) {
     element(id) { return document.getElementById(id); },
     read(code) { return JSON.parse(JSON.stringify(vm.runInContext(code, context))); },
     context,
+    qrs,
+    copiedLinks,
+    shares,
   };
 }
 async function flush() {
@@ -144,16 +157,32 @@ async function flush() {
   const code = banker.read('roomCode');
   assert.match(code, /^\d{4}$/);
   assert.equal(banker.read('players.length'), 1);
-  const clients = ['Alice', 'Bob', 'Carol', 'Dan'].map(name => newClient(name, hub));
+  const inviteLink = banker.read('inviteRoomUrl()');
+  assert.equal(inviteLink, 'https://zhuravskayyar.github.io/monopolia/?room=' + code);
+  banker.eval('openRoomInvite()');
+  assert.equal(banker.qrs.length, 1, 'QR is generated for banker's room');
+  assert.equal(banker.qrs[0].text, inviteLink, 'QR encodes deep link, not only homepage');
+  assert.equal(banker.qrs[0].width, 224);
+  assert.ok(banker.element('cardContent').innerHTML.includes('Копіювати посилання'));
+  await banker.eval('copyRoomInvite()');
+  assert.deepEqual(banker.copiedLinks, [inviteLink], 'clipboard receives exact room invite link');
+  await banker.eval('shareRoomInvite()');
+  assert.equal(banker.shares.length, 1);
+  assert.equal(banker.shares[0].url, inviteLink, 'native share uses same QR URL');
+  const clients = ['Alice', 'Bob', 'Carol', 'Dan'].map(name => newClient(name, hub, inviteLink));
   for (const client of clients) {
+    assert.equal(client.read('incomingRoomCode()'), code, 'opening QR code imports room number');
+    assert.equal(client.eval('showIncomingInviteIfNeeded()'), true);
+    assert.equal(client.element('joinCode').value, code, 'join code is prefilled');
+    assert.ok(client.element('lobbyMessage').textContent.includes(code), 'invite message shows room');
     client.element('lobbyName').value = client.name;
-    client.element('joinCode').value = code;
     client.eval('joinOnlineRoom()');
     await flush();
   }
   assert.equal(banker.read('players.length'), 5, 'banker included among five participants');
   assert.deepEqual(banker.read('players.map(p => p.name)'), ['Banker','Alice','Bob','Carol','Dan']);
   assert.ok(banker.element('roomStatus').innerHTML.includes('Онлайн: 5/5'), 'banker sees 5/5 clients online');
+  assert.ok(banker.element('roomStatus').innerHTML.includes('QR-код · запросити'), 'QR invitation available during game');
   for (const client of clients) {
     assert.equal(client.read('remoteState.players.length'), 5, client.name + ' sees all 5 players');
     assert.equal(client.read('remoteState.roomCode'), code);
@@ -197,5 +226,11 @@ async function flush() {
   for (const client of clients) {
     assert.equal(client.read('remoteState.players.find(p=>p.name==="Alice").money'), 1200);
   }
-  console.log('PASS: 1 banker + 4 players, 5-way state/transfer/building sync, reconnect without duplicates or stale connection loss');
+  const invalidInvite = newClient('Invalid', new Map(), 'https://zhuravskayyar.github.io/monopolia/?room=bad');
+  assert.equal(invalidInvite.eval('showIncomingInviteIfNeeded()'), false, 'invalid room code ignored');
+  assert.equal(invalidInvite.element('joinCode').value, '', 'invalid code not auto-populated');
+  banker.context.window.QRCode = undefined;
+  banker.eval('openRoomInvite()');
+  assert.ok(banker.element('roomQrCode').textContent.includes('Скористайтеся посиланням'), 'fallback if QR library missing');
+  console.log('PASS: QR invite, clipboard/share, deep links, 1 banker + 4 players, state/transfer/building sync and reconnect');
 })().catch(error => { console.error(error); process.exitCode = 1; });
