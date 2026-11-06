@@ -1,4 +1,4 @@
-name: Monopoly rules
+name: Monopoly rules and multiplayer
 
 on:
   push:
@@ -18,5 +18,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate game JavaScript and Monopoly rules
+      - name: Validate Monopoly rules
         run: node tests/rules.test.cjs
+      - name: Validate 5-player synchronized room
+        run: node tests/online-sync.test.cjs
