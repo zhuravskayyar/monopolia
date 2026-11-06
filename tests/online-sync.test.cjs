@@ -96,7 +96,7 @@ function newClient(name, hub) {
     body: new Element(),
     visibilityState: 'visible',
     addEventListener() {},
-    querySelectorAll() { return []; },
+    querySelectorAll(selector) { return selector === '.tab-button' ? Array.from({length:5}, () => new Element()) : []; },
     getElementById(id) {
       if (!elements.has(id)) elements.set(id, new Element());
       return elements.get(id);
