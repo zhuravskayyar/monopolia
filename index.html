@@ -1208,7 +1208,7 @@ function connectAsPlayer(name) {
     if (onlinePeer && !onlinePeer.destroyed) onlinePeer.destroy();
     onlinePeer = new Peer();
     onlinePeer.on('open', () => connectToBanker(name));
-    onlinePeer.on('error', () => lobbyError('Кімнату не знайдено або банкір не в мережі'));
+    onlinePeer.on('error', () => { lobbyError('Кімнату не знайдено або банкір не в мережі. Повторюємо підключення…'); schedulePlayerReconnect(name); });
 }
 
 function connectToBanker(name) {
@@ -1219,12 +1219,13 @@ function connectToBanker(name) {
         hostConnection.send({type:'join', player:{id:myPlayerId, name}});
     });
     hostConnection.on('data', handlePlayerMessage);
-    hostConnection.on('close', () => schedulePlayerReconnect(name));
+    hostConnection.on('close', () => { if (hostConnection && !hostConnection.open) schedulePlayerReconnect(name); });
     hostConnection.on('error', () => schedulePlayerReconnect(name));
 }
 
 function schedulePlayerReconnect(name) {
     clearTimeout(reconnectTimer);
+    if (onlineRole !== 'player') return;
     reconnectTimer = setTimeout(() => {
         if (document.visibilityState === 'visible' && navigator.onLine) connectAsPlayer(name);
     }, 1200);
@@ -1237,12 +1238,18 @@ function bindRoomConnection(connection) {
             if (!requested?.id || !requested?.name) return;
             const returningPlayer = players.find(player => player.id === requested.id);
             if (returningPlayer) {
+                if (returningPlayer.name !== requested.name) {
+                    connection.send({type:'error', message:'Ідентифікатор гравця не збігається з іменем'}); return;
+                }
                 connection.playerId = returningPlayer.id;
                 roomConnections.set(returningPlayer.id, connection);
                 connection.send({type:'joined', playerId:returningPlayer.id});
                 connection.send({type:'state', state:roomSnapshot()});
                 updateRoomStatus();
                 return;
+            }
+            if (players.length >= 8) {
+                connection.send({type:'error', message:'Кімната заповнена (максимум 8 гравців)'}); return;
             }
             if (players.some(player => player.name.toLowerCase() === requested.name.toLowerCase())) {
                 connection.send({type:'error', message:'Це імʼя вже зайняте'}); return;
@@ -1251,11 +1258,15 @@ function bindRoomConnection(connection) {
             const player = {id:requested.id, name:requested.name.slice(0,20), color:colors[(players.length - 1) % colors.length], money:1500};
             players.push(player); connection.playerId = player.id; roomConnections.set(player.id, connection);
             renderPlayers(); updateGameAndSave(); connection.send({type:'joined', playerId:player.id}); broadcastRoomState(); updateRoomStatus();
-        } else if (message.type === 'transfer' && connection.playerId) {
+        } else if (message.type === 'transfer' && connection.playerId && roomConnections.get(connection.playerId) === connection) {
             processTransfer(connection.playerId, message.targetId, Number(message.amount), connection);
         }
     });
-    connection.on('close', () => { if (connection.playerId) roomConnections.delete(connection.playerId); updateRoomStatus(); });
+    connection.on('close', () => {
+        // A stale WebRTC connection must not remove a replacement connection after rejoin.
+        if (connection.playerId && roomConnections.get(connection.playerId) === connection) roomConnections.delete(connection.playerId);
+        updateRoomStatus();
+    });
 }
 
 function roomSnapshot() { return {players, properties, railroads, utilities, roomCode, bankerId:myPlayerId}; }
@@ -1266,7 +1277,7 @@ function broadcastRoomState() {
     updateRoomStatus();
 }
 function handlePlayerMessage(message) {
-    if (message.type === 'error') return lobbyError(message.message);
+    if (message.type === 'error') { lobbyError(message.message); showSaveNotification(message.message); return; }
     if (message.type === 'joined') { document.getElementById('roomLobby').classList.add('hidden'); document.body.classList.add('player-mode'); }
     if (message.type === 'state') { remoteState = message.state; renderPlayerDashboard(); }
     if (message.type === 'notice') showSaveNotification(message.message);
@@ -1285,12 +1296,22 @@ function renderPlayerDashboard() {
     const me = remoteState.players.find(player => player.id === myPlayerId);
     if (!me) return showPlayerConnectionError('Гравця видалено з кімнати');
     const owned = [...remoteState.properties, ...remoteState.railroads, ...remoteState.utilities].filter(item => item.owner === me.name);
+    const remoteStreetRent = item => {
+        if (!item.owner || item.mortgaged) return 0;
+        const monopoly = remoteState.properties.filter(prop => prop.group === item.group).every(prop => prop.owner === item.owner);
+        return item.houses === 0 && monopoly ? item.rent[0] * 2 : item.rent[item.houses];
+    };
     document.getElementById('playerDashboard').classList.remove('hidden');
     document.getElementById('playerDashboard').innerHTML = `<div class="player-shell"><div class="player-head"><div><small>Кімната ${remoteState.roomCode}</small><h2 style="text-align:left;margin:4px 0">${escapeHtml(me.name)}</h2></div><button class="small" style="width:auto;background:rgba(255,255,255,.1)" onclick="leaveOnlineRoom()">Вийти</button></div>
         <div class="balance-card"><small>Твій баланс</small><div class="balance-value">${me.money} ₴</div></div>
         <div class="pay-grid"><button onclick="openPaymentPicker()">Заплатити гравцю</button><button class="warning" onclick="openPaymentAmount('bank','Банк')">Заплатити банку</button></div>
         <section class="player-section"><h3>Гравці</h3><div class="remote-list">${remoteState.players.filter(player => player.id !== myPlayerId).map(player => `<div class="remote-row"><span><i class="owner-dot" style="background:${player.color}"></i>${escapeHtml(player.name)} · ${player.money} ₴</span><button onclick="openPaymentAmount('${player.id}','${escapeHtml(player.name)}')">Платити</button></div>`).join('')}</div></section>
-        <section class="player-section"><h3>Моя власність · ${owned.length}</h3><div class="remote-list">${owned.length ? owned.map(item => `<div class="remote-row"><span>${escapeHtml(item.name)}</span><strong>${item.price} ₴</strong></div>`).join('') : '<div class="remote-row">Поки немає власності</div>'}</div></section></div>`;
+        <section class="player-section"><h3>Моя власність · ${owned.length}</h3><div class="remote-list">${owned.length ? owned.map(item => {
+            const street = remoteState.properties.includes(item);
+            const buildingText = street ? (item.houses === 5 ? 'Готель' : item.houses ? item.houses + ' буд.' : '0 буд.') : '';
+            const rentText = street ? remoteStreetRent(item) + ' ₴ оренда' : item.price + ' ₴ вартість';
+            return `<div class="remote-row"><span>${escapeHtml(item.name)}${item.mortgaged ? ' · Закладено' : ''}${buildingText ? ' · ' + buildingText : ''}</span><strong>${rentText}</strong></div>`;
+        }).join('') : '<div class="remote-row">Поки немає власності</div>'}</div></section></div>`;
 }
 function showPlayerConnectionError(message) { document.getElementById('playerDashboard').innerHTML = `<div class="player-shell"><div class="balance-card"><h2>${message}</h2><button onclick="location.reload()">Повернутися</button></div></div>`; }
 
