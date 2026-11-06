@@ -791,7 +791,19 @@ h1 small { display: block; margin-top: 4px; font-size: .48em; font-weight: 500; 
 .role-card small { color: #c9d8d1; font-weight: 500; }
 .lobby-step-title { margin: 4px 0 14px; font-size: 1.15rem; text-align: center; }
 .room-code { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,.12); color: white; font-weight: 800; letter-spacing: .08em; }
-.room-status { max-width: 980px; margin: 0 auto 7px; color: #c9d8d1; font-size: .8rem; }
+.room-status { max-width: 980px; margin: 0 auto 7px; color: #c9d8d1; font-size: .8rem; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.room-status button { width: auto; margin: 0; padding: 8px 12px; font-size: .78rem; }
+.room-status .invite-trigger { background: #d6ab57; color: #162b22; font-weight: 800; }
+.room-qr-panel { display: flex; flex-direction: column; align-items: center; gap: 13px; color: var(--ink); }
+.room-qr-card { background: #fff; padding: 16px; border: 2px solid #d7c59c; border-radius: 20px; box-shadow: 0 6px 25px rgba(0,0,0,.08); }
+#roomQrCode { display: grid; place-items: center; width: 224px; height: 224px; }
+#roomQrCode img, #roomQrCode canvas { max-width: 100%; height: auto; }
+.room-qr-code { color: var(--green); font-size: 1.7rem; font-weight: 850; letter-spacing: .12em; }
+.room-qr-hint { margin: 0; max-width: 290px; text-align: center; line-height: 1.4; color: var(--muted); font-size: .85rem; }
+.room-invite-link { margin: 0; padding: 11px; width: 100%; font-size: .75rem; overflow: hidden; text-overflow: ellipsis; text-align: center; background: #ecebe4; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; }
+.room-invite-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.room-invite-actions button { margin: 0; min-width: 0; padding: 11px 7px; font-size: .82rem; }
+@media(max-width:380px) { .room-qr-card { padding: 10px; } #roomQrCode { width: 205px; height: 205px; } }
 .banker-wallet { display: none; max-width: 980px; margin: 8px auto 12px; padding: 12px; border-radius: 16px; background: rgba(255,255,255,.1); color: white; border: 1px solid rgba(255,255,255,.12); }
 .banker-wallet.visible { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; }
 .banker-balance small { display: block; color: #c9d8d1; font-size: .7rem; }
@@ -1097,6 +1109,7 @@ button:disabled { opacity: .38; cursor: not-allowed; }
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
 // Ключі для localStorage
 const STORAGE_KEYS = {
@@ -1110,7 +1123,7 @@ const STORAGE_KEYS = {
 };
 
 // Версія гри (для оновлень)
-const GAME_VERSION = '2.1';
+const GAME_VERSION = '2.2';
 const BANK_HOUSE_LIMIT = 32;
 const BANK_HOTEL_LIMIT = 12;
 
@@ -1163,6 +1176,78 @@ function resetLobbyRole() {
     document.getElementById('detailsStep').classList.add('hidden');
     document.getElementById('roleStep').classList.remove('hidden');
     lobbyError('');
+}
+function inviteRoomUrl(code = roomCode) {
+    if (!/^\\d{4}$/.test(code)) return '';
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('room', code);
+    return url.toString();
+}
+function incomingRoomCode() {
+    const code = new URLSearchParams(window.location.search).get('room');
+    return /^\\d{4}$/.test(code || '') ? code : '';
+}
+function openRoomInvite() {
+    if (onlineRole !== 'banker' || !/^\\d{4}$/.test(roomCode)) return;
+    const link = inviteRoomUrl();
+    showCard('QR-код кімнати', `<div class="room-qr-panel">
+        <div class="room-qr-code" aria-label="Код кімнати ${roomCode}">${roomCode}</div>
+        <div class="room-qr-card"><div id="roomQrCode" role="img" aria-label="QR-код для входу в кімнату ${roomCode}"></div></div>
+        <p class="room-qr-hint">Покажи QR-код іншим 4 гравцям. Після сканування достатньо ввести імʼя — код кімнати підставиться автоматично.</p>
+        <input class="room-invite-link" aria-label="Посилання на кімнату" value="${escapeHtml(link)}" readonly onclick="this.select()">
+        <div class="room-invite-actions">
+            <button onclick="copyRoomInvite()">Копіювати посилання</button>
+            <button class="secondary" onclick="shareRoomInvite()">Поділитися</button>
+        </div>
+    </div>`);
+    const target = document.getElementById('roomQrCode');
+    if (typeof window.QRCode === 'function') {
+        try {
+            new window.QRCode(target, {
+                text: link, width: 224, height: 224,
+                colorDark: '#162f25', colorLight: '#ffffff',
+                correctLevel: window.QRCode.CorrectLevel.M
+            });
+        } catch (error) {
+            console.error('QR-код не згенеровано', error);
+            target.textContent = 'QR-код недоступний. Скористайтеся посиланням нижче.';
+        }
+    } else {
+        target.textContent = 'QR-код не завантажився. Скористайтеся посиланням нижче.';
+    }
+}
+async function copyRoomInvite() {
+    const link = inviteRoomUrl();
+    if (!link) return;
+    try {
+        if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+        await navigator.clipboard.writeText(link);
+        showSaveNotification('Посилання на кімнату скопійовано');
+    } catch {
+        window.prompt('Скопіюйте посилання на кімнату:', link);
+    }
+}
+async function shareRoomInvite() {
+    const url = inviteRoomUrl();
+    if (!url) return;
+    if (!navigator.share) return copyRoomInvite();
+    try {
+        await navigator.share({title: 'Монополія — кімната ' + roomCode, text: 'Приєднуйся до гри!', url});
+    } catch (error) {
+        if (error.name !== 'AbortError') await copyRoomInvite();
+    }
+}
+function showIncomingInviteIfNeeded() {
+    const code = incomingRoomCode();
+    if (!code) return false;
+    const current = getOnlineSession();
+    if (current && current.roomCode === code) return false;
+    chooseLobbyRole('player');
+    document.getElementById('joinCode').value = code;
+    lobbyError('Запрошення до кімнати ' + code + '. Введіть імʼя, щоб приєднатися.');
+    return true;
 }
 function ensurePeerJs() {
     if (window.Peer) return true;
@@ -1286,7 +1371,7 @@ function updateRoomStatus() {
     if (onlineRole !== 'banker') return;
     const banker = players.find(player => player.id === myPlayerId);
     const connectedCount = 1 + [...roomConnections.values()].filter(connection => connection.open).length;
-    document.getElementById('roomStatus').innerHTML = `<span class="room-code">КІМНАТА ${roomCode}</span> · ${players.length} учасників · Онлайн: ${connectedCount}/${players.length} · ти банкір <button class="small" style="display:inline-flex;width:auto;background:transparent" onclick="leaveOnlineRoom()">Вийти</button>`;
+    document.getElementById('roomStatus').innerHTML = `<span class="room-code">КІМНАТА ${roomCode}</span> <span>${players.length} учасників · Онлайн: ${connectedCount}/${players.length}</span> <button class="invite-trigger" onclick="openRoomInvite()">▦ QR-код · запросити</button><button class="small secondary" onclick="leaveOnlineRoom()">Вийти</button>`;
     const wallet = document.getElementById('bankerWallet');
     wallet.classList.add('visible');
     wallet.innerHTML = `<div class="banker-balance"><small>Твій особистий баланс</small><strong>${banker?.money ?? 0} ₴</strong></div><button onclick="openPaymentPicker()">Заплатити гравцю</button><button class="warning" onclick="openPaymentAmount('bank','Банк')">Заплатити банку</button>`;
@@ -2951,7 +3036,7 @@ function updateGame() {
 }
 
 // Ініціалізація при завантаженні
-window.onload = () => { resumeOnlineSession(); };
+window.onload = () => { if (!showIncomingInviteIfNeeded()) resumeOnlineSession(); };
 document.addEventListener('visibilitychange', restoreConnectionAfterWake);
 window.addEventListener('online', restoreConnectionAfterWake);
 
