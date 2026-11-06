@@ -121,6 +121,7 @@ function newClient(name, hub) {
     prompt() { return null; },
     location: {reload() {}},
   };
+  context.window.Peer = context.Peer; // PeerJS publishes the constructor on window.
   vm.createContext(context);
   program.runInContext(context);
   return {
