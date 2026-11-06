@@ -1285,7 +1285,8 @@ function handlePlayerMessage(message) {
 function updateRoomStatus() {
     if (onlineRole !== 'banker') return;
     const banker = players.find(player => player.id === myPlayerId);
-    document.getElementById('roomStatus').innerHTML = `<span class="room-code">КІМНАТА ${roomCode}</span> · ${players.length} гравців · ти банкір <button class="small" style="display:inline-flex;width:auto;background:transparent" onclick="leaveOnlineRoom()">Вийти</button>`;
+    const connectedCount = 1 + [...roomConnections.values()].filter(connection => connection.open).length;
+    document.getElementById('roomStatus').innerHTML = `<span class="room-code">КІМНАТА ${roomCode}</span> · ${players.length} учасників · Онлайн: ${connectedCount}/${players.length} · ти банкір <button class="small" style="display:inline-flex;width:auto;background:transparent" onclick="leaveOnlineRoom()">Вийти</button>`;
     const wallet = document.getElementById('bankerWallet');
     wallet.classList.add('visible');
     wallet.innerHTML = `<div class="banker-balance"><small>Твій особистий баланс</small><strong>${banker?.money ?? 0} ₴</strong></div><button onclick="openPaymentPicker()">Заплатити гравцю</button><button class="warning" onclick="openPaymentAmount('bank','Банк')">Заплатити банку</button>`;
