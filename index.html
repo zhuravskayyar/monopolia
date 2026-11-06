@@ -1109,7 +1109,7 @@ button:disabled { opacity: .38; cursor: not-allowed; }
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="vendor/qrcode.min.js"></script>
 <script>
 // Ключі для localStorage
 const STORAGE_KEYS = {
@@ -1178,7 +1178,7 @@ function resetLobbyRole() {
     lobbyError('');
 }
 function inviteRoomUrl(code = roomCode) {
-    if (!/^\\d{4}$/.test(code)) return '';
+    if (!/^\d{4}$/.test(code)) return '';
     const url = new URL(window.location.href);
     url.search = '';
     url.hash = '';
@@ -1187,10 +1187,10 @@ function inviteRoomUrl(code = roomCode) {
 }
 function incomingRoomCode() {
     const code = new URLSearchParams(window.location.search).get('room');
-    return /^\\d{4}$/.test(code || '') ? code : '';
+    return /^\d{4}$/.test(code || '') ? code : '';
 }
 function openRoomInvite() {
-    if (onlineRole !== 'banker' || !/^\\d{4}$/.test(roomCode)) return;
+    if (onlineRole !== 'banker' || !/^\d{4}$/.test(roomCode)) return;
     const link = inviteRoomUrl();
     showCard('QR-код кімнати', `<div class="room-qr-panel">
         <div class="room-qr-code" aria-label="Код кімнати ${roomCode}">${roomCode}</div>
