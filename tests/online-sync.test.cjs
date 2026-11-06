@@ -160,7 +160,7 @@ async function flush() {
   const inviteLink = banker.read('inviteRoomUrl()');
   assert.equal(inviteLink, 'https://zhuravskayyar.github.io/monopolia/?room=' + code);
   banker.eval('openRoomInvite()');
-  assert.equal(banker.qrs.length, 1, 'QR is generated for banker's room');
+  assert.equal(banker.qrs.length, 1, 'QR is generated for the banker room');
   assert.equal(banker.qrs[0].text, inviteLink, 'QR encodes deep link, not only homepage');
   assert.equal(banker.qrs[0].width, 224);
   assert.ok(banker.element('cardContent').innerHTML.includes('Копіювати посилання'));
